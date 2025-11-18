@@ -35,6 +35,9 @@ import Account from "./components/Account";
 import ItemDetails from "./components/ItemDetails";
 import ProtectedStoreRoute from "./components/ProtectedStoreRoute";
 import OnlineStoreLogin from "./components/OnlineStoreLogin";
+import Promotion from "./components/Promotion_page";
+import Form from "./components/Forms";
+import AdminPageViewCount from "./components/AdminPromotionvisit"
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -74,6 +77,9 @@ function App() {
     }
   />
   <Route path="/onlinestorelogin" element={<OnlineStoreLogin />} />
+  <Route path="/More-Info" element={<Promotion />} />
+    <Route path="/Forms" element={<Form />} />
+    <Route path="/FormsGujratVisit" element={< AdminPageViewCount/>} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/onlinestorecheckout" element={<OnlineStoreCheckout />} />

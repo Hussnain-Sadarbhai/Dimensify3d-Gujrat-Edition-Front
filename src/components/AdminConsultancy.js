@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Container, Card, Spinner, Alert, Button, Row, Col, Badge } from "react-bootstrap";
-
+import {
+  Container,
+  Card,
+  Spinner,
+  Alert,
+  Button,
+  Row,
+  Col,
+  Badge,
+} from "react-bootstrap";
+import API_BASE_URL from "./apiConfig";
 const AdminConsultancyRequests = () => {
   const [loading, setLoading] = useState(true);
   const [consultancies, setConsultancies] = useState([]);
@@ -9,7 +18,7 @@ const AdminConsultancyRequests = () => {
   useEffect(() => {
     const fetchConsultancies = async () => {
       try {
-        const res = await fetch("http://localhost:2026/api/consultancy-requests");
+        const res = await fetch(`${API_BASE_URL}/api/consultancy-requests`);
         const data = await res.json();
 
         if (!data.success) {
@@ -51,7 +60,7 @@ const AdminConsultancyRequests = () => {
   const handleAttended = async (userId, consultancyId) => {
     try {
       const res = await fetch(
-        `http://localhost:2026/api/users/${userId}/consultancy/${consultancyId}/status`,
+        `API_BASE_URL/api/users/${userId}/consultancy/${consultancyId}/status`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -90,7 +99,9 @@ const AdminConsultancyRequests = () => {
                   <span style={styles.titleIcon}>📋</span>
                   Consultancy Management Dashboard
                 </h1>
-                <p style={styles.subtitle}>Manage and track all consultancy requests efficiently</p>
+                <p style={styles.subtitle}>
+                  Manage and track all consultancy requests efficiently
+                </p>
               </div>
             </Col>
             <Col md={4} className="text-end">
@@ -121,12 +132,14 @@ const AdminConsultancyRequests = () => {
               </Col>
             </Row>
           </Card.Header>
-          
+
           <Card.Body style={styles.cardBody}>
             {loading ? (
               <div className="text-center py-5">
                 <Spinner animation="border" variant="primary" size="lg" />
-                <p style={styles.loadingText} className="mt-3">Loading requests...</p>
+                <p style={styles.loadingText} className="mt-3">
+                  Loading requests...
+                </p>
               </div>
             ) : error ? (
               <Alert variant="danger" style={styles.alertBox}>
@@ -147,7 +160,7 @@ const AdminConsultancyRequests = () => {
                       <Card.Header style={styles.requestHeader}>
                         <div style={styles.userInfo}>
                           <div style={styles.userAvatar}>
-                            {req.userName?.charAt(0)?.toUpperCase() || 'U'}
+                            {req.userName?.charAt(0)?.toUpperCase() || "U"}
                           </div>
                           <div>
                             <h5 style={styles.userName}>{req.userName}</h5>
@@ -164,26 +177,34 @@ const AdminConsultancyRequests = () => {
                           <div style={styles.infoItem}>
                             <span style={styles.infoLabel}>📞 Phone:</span>
                             <div style={styles.phoneContainer}>
-                              <span style={styles.infoValue}>{req.userPhone}</span>
+                              <span style={styles.infoValue}>
+                                {req.userPhone}
+                              </span>
                               <Button
                                 variant="outline-primary"
                                 size="sm"
                                 style={styles.copyButton}
-                                onClick={() => copyPhoneToClipboard(req.userPhone)}
+                                onClick={() =>
+                                  copyPhoneToClipboard(req.userPhone)
+                                }
                                 title="Copy phone number"
                               >
                                 📋
                               </Button>
                             </div>
                           </div>
-                          
+
                           <div style={styles.infoItem}>
-                            <span style={styles.infoLabel}>📅 Preferred Date:</span>
+                            <span style={styles.infoLabel}>
+                              📅 Preferred Date:
+                            </span>
                             <span style={styles.infoValue}>{req.date}</span>
                           </div>
-                          
+
                           <div style={styles.infoItem}>
-                            <span style={styles.infoLabel}>🕒 Requested At:</span>
+                            <span style={styles.infoLabel}>
+                              🕒 Requested At:
+                            </span>
                             <span style={styles.infoValue}>
                               {new Date(req.createdAt).toLocaleString()}
                             </span>
@@ -192,20 +213,26 @@ const AdminConsultancyRequests = () => {
 
                         {req.problem && (
                           <div style={styles.problemSection}>
-                            <span style={styles.problemLabel}>💭 Problem Description:</span>
+                            <span style={styles.problemLabel}>
+                              💭 Problem Description:
+                            </span>
                             <p style={styles.problemText}>{req.problem}</p>
                           </div>
                         )}
 
                         {req.photoUrl && (
                           <div style={styles.photoSection}>
-                            <span style={styles.photoLabel}>📷 Attachment:</span>
+                            <span style={styles.photoLabel}>
+                              📷 Attachment:
+                            </span>
                             <div style={styles.photoContainer}>
                               <img
                                 src={req.photoUrl}
                                 alt="consultancy attachment"
                                 style={styles.photo}
-                                onClick={() => window.open(req.photoUrl, '_blank')}
+                                onClick={() =>
+                                  window.open(req.photoUrl, "_blank")
+                                }
                               />
                             </div>
                           </div>
@@ -217,7 +244,9 @@ const AdminConsultancyRequests = () => {
                         <Button
                           variant="success"
                           style={styles.attendedButton}
-                          onClick={() => handleAttended(req.userId, req.consultancyId)}
+                          onClick={() =>
+                            handleAttended(req.userId, req.consultancyId)
+                          }
                           className="w-100"
                         >
                           <span style={styles.buttonIcon}>✓</span>
@@ -239,24 +268,26 @@ const AdminConsultancyRequests = () => {
 // Enhanced Internal CSS
 const styles = {
   body: {
-    background: "linear-gradient(135deg, #f5f5f5 0%, #e9edf2 25%, #dce2e8 50%, #cfd6dd 75%, #e9edf2 100%)",
+    background:
+      "linear-gradient(135deg, #f5f5f5 0%, #e9edf2 25%, #dce2e8 50%, #cfd6dd 75%, #e9edf2 100%)",
     minHeight: "100vh",
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
   },
-  
+
   // Page Header Styles
   pageHeader: {
-    background: "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
+    background:
+      "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
     padding: "2rem 0",
     marginBottom: "2rem",
     borderBottom: "4px solid rgba(255, 255, 255, 0.2)",
     boxShadow: "0 4px 20px rgba(42, 101, 197, 0.3)",
   },
-  
+
   headerContent: {
     color: "white",
   },
-  
+
   pageTitle: {
     fontSize: "2.5rem",
     fontWeight: "700",
@@ -264,19 +295,19 @@ const styles = {
     color: "white",
     textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
   },
-  
+
   titleIcon: {
     marginRight: "1rem",
     fontSize: "2.2rem",
   },
-  
+
   subtitle: {
     fontSize: "1.1rem",
     margin: 0,
     opacity: 0.9,
     fontWeight: "300",
   },
-  
+
   statsCard: {
     background: "rgba(255, 255, 255, 0.15)",
     borderRadius: "16px",
@@ -285,46 +316,47 @@ const styles = {
     backdropFilter: "blur(10px)",
     border: "1px solid rgba(255, 255, 255, 0.2)",
   },
-  
+
   statNumber: {
     fontSize: "2.5rem",
     fontWeight: "bold",
     color: "white",
     lineHeight: 1,
   },
-  
+
   statLabel: {
     color: "rgba(255, 255, 255, 0.9)",
     fontSize: "0.9rem",
     marginTop: "0.5rem",
     fontWeight: "500",
   },
-  
+
   // Main Card Styles
   mainCard: {
     borderRadius: "20px",
     border: "none",
     overflow: "hidden",
   },
-  
+
   cardHeader: {
-    background: "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
+    background:
+      "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
     border: "none",
     padding: "1.5rem 2rem",
   },
-  
+
   cardTitle: {
     color: "white",
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: "600",
   },
-  
+
   cardIcon: {
     marginRight: "0.75rem",
     fontSize: "1.3rem",
   },
-  
+
   headerBadge: {
     background: "rgba(255, 255, 255, 0.2)",
     color: "white",
@@ -334,12 +366,12 @@ const styles = {
     fontWeight: "500",
     border: "1px solid rgba(255, 255, 255, 0.3)",
   },
-  
+
   cardBody: {
     padding: "2rem",
     background: "white",
   },
-  
+
   // Alert Styles
   alertBox: {
     borderRadius: "12px",
@@ -349,18 +381,18 @@ const styles = {
     display: "flex",
     alignItems: "center",
   },
-  
+
   alertIcon: {
     marginRight: "0.75rem",
     fontSize: "1.2rem",
   },
-  
+
   loadingText: {
     color: "#6c757d",
     fontSize: "1.1rem",
     margin: 0,
   },
-  
+
   // Request Card Styles
   requestCard: {
     borderRadius: "16px",
@@ -368,25 +400,26 @@ const styles = {
     transition: "all 0.3s ease",
     overflow: "hidden",
   },
-  
+
   requestHeader: {
     background: "linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%)",
     border: "none",
     padding: "1rem 1.5rem",
     borderBottom: "2px solid #e3e6f0",
   },
-  
+
   userInfo: {
     display: "flex",
     alignItems: "center",
     gap: "1rem",
   },
-  
+
   userAvatar: {
     width: "50px",
     height: "50px",
     borderRadius: "50%",
-    background: "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
+    background:
+      "linear-gradient(316deg, rgb(42, 101, 197) 0%, rgb(10, 80, 177) 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -395,29 +428,29 @@ const styles = {
     fontWeight: "bold",
     boxShadow: "0 4px 12px rgba(42, 101, 197, 0.3)",
   },
-  
+
   userName: {
     margin: 0,
     fontSize: "1.2rem",
     fontWeight: "600",
     color: "#2a65c5",
   },
-  
+
   requestDate: {
     color: "#6c757d",
     fontSize: "0.9rem",
   },
-  
+
   requestBody: {
     padding: "1.5rem",
   },
-  
+
   infoGrid: {
     display: "grid",
     gap: "1rem",
     marginBottom: "1rem",
   },
-  
+
   infoItem: {
     display: "flex",
     justifyContent: "space-between",
@@ -427,19 +460,19 @@ const styles = {
     borderRadius: "8px",
     border: "1px solid #e3e6f0",
   },
-  
+
   infoLabel: {
     fontWeight: "600",
     color: "#495057",
     fontSize: "0.9rem",
   },
-  
+
   infoValue: {
     color: "#2a65c5",
     fontWeight: "500",
     fontSize: "0.9rem",
   },
-  
+
   phoneValue: {
     color: "#2a65c5",
     fontWeight: "500",
@@ -451,13 +484,13 @@ const styles = {
     textDecoration: "underline",
     textDecorationStyle: "dotted",
   },
-  
+
   phoneContainer: {
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
   },
-  
+
   copyButton: {
     padding: "0.25rem 0.5rem",
     fontSize: "0.8rem",
@@ -472,7 +505,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
-  
+
   problemSection: {
     marginTop: "1rem",
     padding: "1rem",
@@ -480,7 +513,7 @@ const styles = {
     borderRadius: "8px",
     border: "1px solid #ffeaa7",
   },
-  
+
   problemLabel: {
     fontWeight: "600",
     color: "#856404",
@@ -488,17 +521,17 @@ const styles = {
     display: "block",
     marginBottom: "0.5rem",
   },
-  
+
   problemText: {
     margin: 0,
     color: "#856404",
     lineHeight: 1.5,
   },
-  
+
   photoSection: {
     marginTop: "1rem",
   },
-  
+
   photoLabel: {
     fontWeight: "600",
     color: "#495057",
@@ -506,11 +539,11 @@ const styles = {
     display: "block",
     marginBottom: "0.75rem",
   },
-  
+
   photoContainer: {
     textAlign: "center",
   },
-  
+
   photo: {
     maxWidth: "100%",
     maxHeight: "200px",
@@ -520,14 +553,14 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s ease",
   },
-  
+
   requestFooter: {
     background: "#f8f9fc",
     border: "none",
     borderTop: "2px solid #e3e6f0",
     padding: "1rem 1.5rem",
   },
-  
+
   attendedButton: {
     background: "linear-gradient(135deg, #28a745 0%, #20c997 100%)",
     border: "none",
@@ -538,7 +571,7 @@ const styles = {
     boxShadow: "0 4px 12px rgba(40, 167, 69, 0.3)",
     transition: "all 0.3s ease",
   },
-  
+
   buttonIcon: {
     marginRight: "0.5rem",
     fontSize: "1.1rem",

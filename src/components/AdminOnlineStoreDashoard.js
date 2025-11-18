@@ -115,6 +115,9 @@ function AdminOnlineStoreDashboard() {
         navigate("/adminonlinestoreorderprint")
     }
 
+function goUserManagement() {
+  navigate('/FormsGujratVisit');
+}
 
     const menuItems = [
         {
@@ -142,6 +145,12 @@ function AdminOnlineStoreDashboard() {
             description: '3D Model Products Order Bill Download as PDF.'
         },
        
+  {
+    title: 'User Management For Gujrat',
+    icon: UserCheck,  // imported from lucide-react
+    onClick: goUserManagement,
+    description: 'Manage users and permissions'
+  }
     ];
 
     const styles = {

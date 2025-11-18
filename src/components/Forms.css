@@ -1,0 +1,139 @@
+/* Center the whole form vertically and horizontally */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+.form {
+  display: flex;
+  flex-direction: column; /* Stack children vertically */
+  gap: 1rem;
+  max-width: 490px;
+  margin: auto;
+  margin-top: 10vh;
+  padding: 2.5rem;
+  background-color: #f8fafc;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin-bottom: 10vh;
+}
+
+.body1{
+      background: linear-gradient(135deg, #cee7ef, #eee4f7); /* Indigo to blue gradient */
+      height: 110vh;
+        font-family: 'Poppins', sans-serif;
+}
+
+                .brand-logo {
+                    width: 120%;
+                    height: 120%;
+                    object-fit: contain;
+                    transform: scale(1.8);
+                } 
+
+                 .logo-wrapper {
+                    width: 60px;
+                    height: 60px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: white;
+                    border-radius: 14px;
+                    padding: 4px;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                }
+                .main{
+                    background: linear-gradient(135deg, #f2f1fb, #f4f8fe); /* Indigo to blue gradient */
+                      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                }
+
+.flex1{  
+    flex: none; /* optional: lets items grow equally */
+    margin-left: 0px;
+    font-size: 25px;
+    width: 150px; /* or your preferred width */
+  max-width: 90vw;
+    align-self: center;
+  
+}
+.flex2{  
+    flex: none; /* optional: lets items grow equally */
+    margin-left: 0px;
+    font-size: 20px;
+    width: 350px; /* or your preferred width */
+  max-width: 90vw;
+  align-self: center;
+  font-family: 'Poppins', sans-serif;
+}
+    .flex2 label,
+  .flex2 input {
+    text-align: left !important;
+    display: block;
+    width: 100%;
+  }
+
+
+.centered-text {
+  margin-top: 0;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+}
+
+
+/* Base styles (your current styles) remain the same */
+@media (max-width: 600px) {
+    .body1{
+      background: linear-gradient(135deg, #cee7ef, #eee4f7); /* Indigo to blue gradient */
+      height: 150vh;
+}
+  .form,
+  .form2 {
+    flex-direction: column;
+    max-width: 90vw;
+    margin-top: 2vh; /* smaller top margin on phone */
+    padding: 1rem;
+    gap: 1rem;
+
+  }
+  .form{
+    margin-top: 5vh;
+    margin-bottom: 10vh;
+  }
+
+  .flex1 {
+    width: 100%; /* full width for better stacking */
+    font-size: 18px; /* slightly smaller font */
+    margin-left: 0;
+  }
+
+  .flex2 {
+    width: 100%; /* full width horizontally */
+    font-size: 16px;
+    margin-left: 0;
+
+  }
+    .flex2 label,
+  .flex2 input {
+    text-align: left !important;
+    display: block;
+    width: 100%;
+  }
+
+  .brand-logo {
+    width: 80px; /* smaller logo */
+    height: auto;
+    transform: scale(1); /* reset scale */
+  }
+
+  .logo-wrapper {
+    width: 50px;
+    height: 50px;
+  }
+
+  .login-rigtpanel {
+    margin-top: 1.5rem; /* reduce margin */
+  }
+
+  .brand-logo2 {
+    width: 100px;
+    margin-bottom: 16px;
+  }
+
+}
