@@ -116,6 +116,9 @@
     width: 100%;
   }
 
+  #eligibleTimeTo,#eligibleTimeFrom{
+    width: 92%;
+  }
   .brand-logo {
     width: 80px; /* smaller logo */
     height: auto;

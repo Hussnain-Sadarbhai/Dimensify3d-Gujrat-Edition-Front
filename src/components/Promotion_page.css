@@ -107,7 +107,7 @@
 
 /* Base styles (your current styles) remain the same */
 @media (max-width: 600px) {
-        .body1{
+        .body{
       background: linear-gradient(135deg, #cee7ef, #eee4f7); /* Indigo to blue gradient */
       height: 150vh;
 }
