@@ -20,7 +20,7 @@ import API_BASE_URL from "./apiConfig";
 const Checkout = () => {
   const [checkoutData, setCheckoutData] = useState(null);
   const [showLoginPopup, setShowLoginPopup] = useState(false);
-  const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [user, setUser] = useState(null);
   const [addresses, setAddresses] = useState([]);
@@ -62,7 +62,8 @@ const Checkout = () => {
         const userPhone = localStorage.getItem("dimensify3duserphoneNo");
         if (!userPhone) {
           setShowLoginPopup(true);
-          localStorage.setItem("last", window.location.pathname);
+              localStorage.setItem("last",window.location.pathname);
+               console.log(localStorage);
           const timer = setTimeout(() => navigate("/login"), 5000);
           return () => clearTimeout(timer);
         }
@@ -150,8 +151,24 @@ const Checkout = () => {
     loadCheckoutData();
   }, [navigate]);
 
-  const handlePlaceOrder = async () => {
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayNow = async () => {
     try {
+      const res = await loadRazorpay();
+      if (!res) {
+        toast.error('Failed to load Razorpay SDK. Check your internet connection.');
+        return;
+      }
+
       const userPhone = localStorage.getItem("dimensify3duserphoneNo");
       if (!userPhone) {
         toast.error('Please login first!');
@@ -164,93 +181,148 @@ const Checkout = () => {
         return;
       }
 
-      setShowOrderSuccessModal(true);
-      setIsProcessingOrder(true);
-
-      const files = checkoutData.files || [];
-      if (!files.length) {
-        setIsProcessingOrder(false);
-        setShowOrderSuccessModal(false);
-        toast.error('No files found in order!');
-        return;
-      }
-
-      const filesWithMissingData = files.filter(f => f.missingFileData);
-      if (filesWithMissingData.length > 0) {
-        toast.error(`Cannot complete order: ${filesWithMissingData.length} file(s) are missing file data.`);
-        setIsProcessingOrder(false);
-        setShowOrderSuccessModal(false);
-        return;
-      }
-
-      const formData = new FormData();
-
-      files.forEach((fileData, index) => {
-        if (fileData.file) {
-          formData.append(`stlFile_${index}`, fileData.file, fileData.fileName);
-        }
-      });
-
       const grandTotal = checkoutData.totalPrice + 40;
 
-      const cleanOrderData = {
-        phone: userPhone,
-        address: selectedAddr[1],
-        orderTimestamp: new Date().toISOString(),
-        paymentId: "COD_" + Date.now(),
-        orderId: "ORDER_" + Date.now(),
-        status: "pending",
-        paymentStatus: "pending",
-        totalPrice: grandTotal,
-        subtotal: checkoutData.subtotal,
-        discountAmount: checkoutData.discountAmount,
-        deliveryCharge: 40,
-        appliedCoupon: checkoutData.appliedCoupon || null,
-        files: files.map((fileData) => ({
-          originalName: fileData.fileName,
-          quantity: fileData.quantity || 1,
-          printSettings: fileData.printSettings || {},
-          dimensions: fileData.dimensions || {},
-          pricing: fileData.pricing || {},
-          printDetails: fileData.printDetails || {},
-          specialNotes: fileData.specialNotes || "",
-          unitPrice: fileData.unitPrice || 0,
-          totalPrice: fileData.totalPrice || 0,
-          modelPosition: fileData.modelPosition || [0, 0, 0],
-          modelRotation: fileData.modelRotation || [0, 0, 0],
-          timestamp: fileData.timestamp || new Date().toISOString()
-        })),
-        fileCount: files.length
-      };
-
-      formData.append("orderData", JSON.stringify(cleanOrderData));
-
-      const orderStoreRes = await fetch(`${API_BASE_URL}/api/orders`, {
+      const orderRes = await fetch(`${API_BASE_URL}/api/createOrder`, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: grandTotal,
+          currency: "INR",
+          receipt: "receipt_" + Date.now(),
+        }),
       });
 
-      const orderStoreData = await orderStoreRes.json();
-      if (orderStoreData.success) {
-        setIsProcessingOrder(false);
-        sessionStorage.removeItem("checkoutData");
-        const db = await initDB();
-        await db.clear('checkout-files');
-        
-        setTimeout(() => {
-          setShowOrderSuccessModal(false);
-          navigate("/");
-        }, 3000);
-      } else {
-        setIsProcessingOrder(false);
-        setShowOrderSuccessModal(false);
-        toast.error(orderStoreData.message || 'Failed to store order');
+      const orderDataRes = await orderRes.json();
+      if (!orderDataRes.success) {
+        toast.error('Failed to create payment order');
+        return;
       }
+
+      const { order } = orderDataRes;
+
+      const options = {
+        key: "rzp_live_RUxw1CnUrnTqD3",
+        amount: order.amount,
+        currency: order.currency,
+        name: "Dimensify3D",
+        description: "3D Printing Order Payment",
+        order_id: order.id,
+        handler: async function (response) {
+          setShowPaymentSuccessModal(true);
+          setIsProcessingOrder(true);
+
+          try {
+            const verifyRes = await fetch(`${API_BASE_URL}/api/verifyOrder`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
+
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success) {
+              const files = checkoutData.files || [];
+              if (!files.length) {
+                setIsProcessingOrder(false);
+                setShowPaymentSuccessModal(false);
+                toast.error('No files found in order!');
+                return;
+              }
+
+              const filesWithMissingData = files.filter(f => f.missingFileData);
+              if (filesWithMissingData.length > 0) {
+                toast.error(`Cannot complete order: ${filesWithMissingData.length} file(s) are missing file data.`);
+                setIsProcessingOrder(false);
+                setShowPaymentSuccessModal(false);
+                return;
+              }
+
+              const formData = new FormData();
+
+              files.forEach((fileData, index) => {
+                if (fileData.file) {
+                  formData.append(`stlFile_${index}`, fileData.file, fileData.fileName);
+                }
+              });
+
+              const cleanOrderData = {
+                phone: userPhone,
+                address: selectedAddr[1],
+                orderTimestamp: new Date().toISOString(),
+                paymentId: response.razorpay_payment_id,
+                orderId: response.razorpay_order_id,
+                status: "paid",
+                totalPrice: checkoutData.totalPrice + 40,
+                subtotal: checkoutData.subtotal,
+                discountAmount: checkoutData.discountAmount,
+                deliveryCharge: 40,
+                appliedCoupon: checkoutData.appliedCoupon || null,
+                files: files.map((fileData) => ({
+                  originalName: fileData.fileName,
+                  quantity: fileData.quantity || 1,
+                  printSettings: fileData.printSettings || {},
+                  dimensions: fileData.dimensions || {},
+                  pricing: fileData.pricing || {},
+                  printDetails: fileData.printDetails || {},
+                  specialNotes: fileData.specialNotes || "",
+                  unitPrice: fileData.unitPrice || 0,
+                  totalPrice: fileData.totalPrice || 0,
+                  modelPosition: fileData.modelPosition || [0, 0, 0],
+                  modelRotation: fileData.modelRotation || [0, 0, 0],
+                  timestamp: fileData.timestamp || new Date().toISOString()
+                })),
+                fileCount: files.length
+              };
+
+              formData.append("orderData", JSON.stringify(cleanOrderData));
+
+              const orderStoreRes = await fetch(`${API_BASE_URL}/api/orders`, {
+                method: "POST",
+                body: formData,
+              });
+
+              const orderStoreData = await orderStoreRes.json();
+              if (orderStoreData.success) {
+                setIsProcessingOrder(false);
+                sessionStorage.removeItem("checkoutData");
+                const db = await initDB();
+                await db.clear('checkout-files');
+                
+                setTimeout(() => {
+                  setShowPaymentSuccessModal(false);
+                  navigate("/");
+                }, 3000);
+              } else {
+                setIsProcessingOrder(false);
+                setShowPaymentSuccessModal(false);
+                toast.error(orderStoreData.message || 'Failed to store order');
+              }
+            } else {
+              setIsProcessingOrder(false);
+              setShowPaymentSuccessModal(false);
+              toast.error('Payment verification failed!');
+            }
+          } catch (err) {
+            console.error("Error processing order:", err);
+            setIsProcessingOrder(false);
+            setShowPaymentSuccessModal(false);
+            toast.error('Something went wrong. Please contact support.');
+          }
+        },
+        prefill: {
+          name: user?.name || "Customer",
+          email: user?.email || "customer@example.com",
+          contact: userPhone,
+        },
+        theme: { color: "#2a65c5" },
+      };
+
+      const rzp1 = new window.Razorpay(options);
+      rzp1.open();
     } catch (err) {
-      console.error("Error processing order:", err);
-      setIsProcessingOrder(false);
-      setShowOrderSuccessModal(false);
-      toast.error('Something went wrong. Please contact support.');
+      console.error("Error in checkout:", err);
+      toast.error('Something went wrong. Please try again!');
     }
   };
 
@@ -267,7 +339,8 @@ const Checkout = () => {
     const userPhone = localStorage.getItem("dimensify3duserphoneNo");
     if (!userPhone) {
       toast.error('User not logged in!');
-      localStorage.setItem("last", window.location.pathname);
+          localStorage.setItem("last",window.location.pathname);
+          console.log(localStorage);
       navigate("/login");
       return;
     }
@@ -304,8 +377,8 @@ const Checkout = () => {
     }
   };
 
-  const OrderSuccessModal = () => (
-    <Modal show={showOrderSuccessModal} centered backdrop="static" keyboard={false} size="md">
+  const PaymentSuccessModal = () => (
+    <Modal show={showPaymentSuccessModal} centered backdrop="static" keyboard={false} size="md">
       <Modal.Body className="text-center py-5" style={{ background: "linear-gradient(135deg, #28a745 0%, #20c997 100%)", color: "white", borderRadius: "0.5rem" }}>
         {isProcessingOrder ? (
           <>
@@ -313,7 +386,7 @@ const Checkout = () => {
               <Spinner animation="border" size="lg" style={{ color: "white" }} />
             </div>
             <h4 className="mb-3">Processing Your Order...</h4>
-            <p className="mb-4">We're saving your order details.</p>
+            <p className="mb-4">Payment successful! We're saving your order details.</p>
             <div className="d-flex align-items-center justify-content-center">
               <Spinner animation="grow" size="sm" className="me-2" />
               <small>Please wait...</small>
@@ -421,7 +494,7 @@ const Checkout = () => {
       border-top: 2px solid #28a745;
     }
 
-    .order-button {
+    .pay-button {
       background: linear-gradient(316deg, rgb(42 101 197) 0%, rgb(10 80 177) 100%);
       border: none;
       border-radius: 0.75rem;
@@ -432,7 +505,7 @@ const Checkout = () => {
       box-shadow: 0 5px 20px rgba(42, 101, 197, 0.3);
     }
 
-    .order-button:hover {
+    .pay-button:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(42, 101, 197, 0.4);
       background: linear-gradient(316deg, rgb(52 111 207) 0%, rgb(20 90 187) 100%);
@@ -483,9 +556,9 @@ const Checkout = () => {
       box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
     }
 
-    .info-note {
-      background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
-      border: 1px solid rgba(255, 193, 7, 0.3);
+    .security-note {
+      background: linear-gradient(145deg, #e3f2fd 0%, #f3e5f5 100%);
+      border: 1px solid rgba(42, 101, 197, 0.2);
       border-radius: 0.5rem;
       padding: 1rem;
       margin-top: 1rem;
@@ -780,20 +853,20 @@ const Checkout = () => {
 
                   <div className="text-center">
                     <Button 
-                      className="order-button w-100" 
+                      className="pay-button w-100" 
                       size="lg"
-                      onClick={handlePlaceOrder}
+                      onClick={handlePayNow}
                       disabled={!selectedAddressKey}
                     >
-                      <i className="fas fa-shopping-bag me-2"></i>
-                      Place Order - ₹{grandTotal}
+                      <i className="fas fa-credit-card me-2"></i>
+                      Proceed to Pay ₹{grandTotal}
                     </Button>
                   </div>
 
-                  <div className="info-note text-center mt-3">
+                  <div className="security-note text-center mt-3">
                     <small>
-                      <i className="fas fa-info-circle me-2"></i>
-                      Payment will be collected upon delivery or as per agreed terms.
+                      <i className="fas fa-shield-alt me-2"></i>
+                      Secure payment powered by Razorpay. Your payment information is encrypted and secure.
                     </small>
                   </div>
                 </Card.Body>
@@ -811,9 +884,9 @@ const Checkout = () => {
                     <div className="mb-3">
                       <i className="fas fa-shield-alt text-primary" style={{ fontSize: "2rem" }}></i>
                     </div>
-                    <h6>Secure Order</h6>
+                    <h6>Secure Payment</h6>
                     <small className="text-muted">
-                      Your order information is protected and secure
+                      Your payment is protected with 256-bit SSL encryption
                     </small>
                   </Col>
                   <Col md={4}>
@@ -841,7 +914,7 @@ const Checkout = () => {
         </Row>
       </Container>
 
-      <OrderSuccessModal />
+      <PaymentSuccessModal />
       <ToastContainer
         position="top-right"
         autoClose={5000}
