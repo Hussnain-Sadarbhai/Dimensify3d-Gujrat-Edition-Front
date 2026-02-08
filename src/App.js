@@ -1,6 +1,11 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { toast, ToastContainer } from 'react-toastify';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
 import STLSlicer from "./components/Slicer";
 import Header from "./components/Header";
 import HelpSection from "./components/Help";
@@ -37,178 +42,176 @@ import ProtectedStoreRoute from "./components/ProtectedStoreRoute";
 import OnlineStoreLogin from "./components/OnlineStoreLogin";
 import Promotion from "./components/Promotion_page";
 import Form from "./components/Forms";
-import AdminPageViewCount from "./components/AdminPromotionvisit"
+import AdminPageViewCount from "./components/AdminPromotionvisit";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
-  const isAdminLoggedIn = localStorage.getItem('d3dadminLogin') === 'true';
-  
+  const isAdminLoggedIn = localStorage.getItem("d3dadminLogin") === "true";
+
   if (!isAdminLoggedIn) {
     return <Navigate to="/" replace />;
   }
-  
+
   return children;
 };
 
 function App() {
   return (
     <>
-     <Router>
-      <div className="App">
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<STLSlicer />} />
-          <Route path="/help" element={<HelpSection />} />
-          <Route path="/adminlogin" element={<AdminLogin />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/consultancy" element={<ConsultancyBooking />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/shippingpolicy" element={<ShippingPolicy />} />
-          <Route path="/cancellationRefundpolicy" element={<CancellationRefundPolicy />} />
-          <Route path="/termsconditions" element={<TermsConditions />} />
-          <Route path="/privacypolicy" element={<PrivacyPolicy />} />
-          <Route
-    path="/onlinestore"
-    element={
-      <ProtectedStoreRoute>
-        <OnlineStore />
-      </ProtectedStoreRoute>
-    }
-  />
-  <Route path="/onlinestorelogin" element={<OnlineStoreLogin />} />
-  <Route path="/More-Info" element={<Promotion />} />
-    <Route path="/Forms" element={<Form />} />
-    <Route path="/FormsGujratVisit" element={< AdminPageViewCount/>} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/about" element={<AboutUs />} />
-          <Route path="/onlinestorecheckout" element={<OnlineStoreCheckout />} />
-          <Route path="/account" element={<Account/>} />
-          <Route path="/itemdetails" element={<ItemDetails/>} />
+      <Router>
+        <div className="App">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<STLSlicer />} />
+            <Route path="/help" element={<HelpSection />} />
+            <Route path="/adminlogin" element={<AdminLogin />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/consultancy" element={<ConsultancyBooking />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/shippingpolicy" element={<ShippingPolicy />} />
+            <Route
+              path="/cancellationRefundpolicy"
+              element={<CancellationRefundPolicy />}
+            />
+            <Route path="/termsconditions" element={<TermsConditions />} />
+            <Route path="/privacypolicy" element={<PrivacyPolicy />} />
+            <Route path="/onlinestore" element={<OnlineStore />} />
+            <Route path="/onlinestorelogin" element={<OnlineStoreLogin />} />
+            <Route path="/More-Info" element={<Promotion />} />
+            <Route path="/Forms" element={<Form />} />
+            <Route path="/FormsGujratVisit" element={<AdminPageViewCount />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route
+              path="/onlinestorecheckout"
+              element={<OnlineStoreCheckout />}
+            />
+            <Route path="/account" element={<Account />} />
+            <Route path="/itemdetails" element={<ItemDetails />} />
 
-          {/* Protected Admin Routes */}
-          <Route 
-            path="/admindashboard" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminDashboard />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminhelp" 
-            element={
-              <ProtectedAdminRoute>
-                <HelpRequests />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminconultancy" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminConsultancyRequests />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/admincoupon" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminCoupon />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminorders" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOrders />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminonlinestore" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOnlineStore />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/orderupdate" 
-            element={
-              <ProtectedAdminRoute>
-                <OrderUpdate />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminorderprint" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOrderPrint />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminonlinestoredashboard" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOnlineStoreDashboard />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminordersonlinestore" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOrdersOnlineStore />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminonlinestoreorderupdate" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOnlineStoreOrderUpdate />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/adminonlinestoreorderprint" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminOnlineStoreOrderPrint />
-              </ProtectedAdminRoute>
-            } 
-          />
-          <Route 
-            path="/admintransaction" 
-            element={
-              <ProtectedAdminRoute>
-                <AdminTransaction />
-              </ProtectedAdminRoute>
-            } 
-          />
-        </Routes>
-      </div>
-    </Router>
-     {/* Toast Container */}
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
+            {/* Protected Admin Routes */}
+            <Route
+              path="/admindashboard"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminDashboard />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminhelp"
+              element={
+                <ProtectedAdminRoute>
+                  <HelpRequests />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminconultancy"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminConsultancyRequests />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/admincoupon"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminCoupon />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminorders"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOrders />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminonlinestore"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOnlineStore />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/orderupdate"
+              element={
+                <ProtectedAdminRoute>
+                  <OrderUpdate />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminorderprint"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOrderPrint />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminonlinestoredashboard"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOnlineStoreDashboard />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminordersonlinestore"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOrdersOnlineStore />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminonlinestoreorderupdate"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOnlineStoreOrderUpdate />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminonlinestoreorderprint"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOnlineStoreOrderPrint />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/admintransaction"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminTransaction />
+                </ProtectedAdminRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </Router>
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </>
-  
   );
 }
 
