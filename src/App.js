@@ -43,6 +43,9 @@ import OnlineStoreLogin from "./components/OnlineStoreLogin";
 import Promotion from "./components/Promotion_page";
 import Form from "./components/Forms";
 import AdminPageViewCount from "./components/AdminPromotionvisit";
+import LandingPage from "./components/LandingPage";
+import AdminLandingPage from "./components/AdminLandingPage";
+import MyHelpReq from "./components/MyHelpReq";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -89,6 +92,8 @@ function App() {
             />
             <Route path="/account" element={<Account />} />
             <Route path="/itemdetails" element={<ItemDetails />} />
+            <Route path="/landing-page" element={<LandingPage/>} />
+            <Route path="/myhelprequest" element={<MyHelpReq/>} />
 
             {/* Protected Admin Routes */}
             <Route
@@ -192,6 +197,14 @@ function App() {
               element={
                 <ProtectedAdminRoute>
                   <AdminTransaction />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminlandingpage"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminLandingPage />
                 </ProtectedAdminRoute>
               }
             />

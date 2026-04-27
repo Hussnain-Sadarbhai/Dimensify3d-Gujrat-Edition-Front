@@ -60,12 +60,12 @@ const AdminConsultancyRequests = () => {
   const handleAttended = async (userId, consultancyId) => {
     try {
       const res = await fetch(
-        `API_BASE_URL/api/users/${userId}/consultancy/${consultancyId}/status`,
+        `${API_BASE_URL}/api/users/${userId}/consultancy/${consultancyId}/status`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "attended" }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -75,8 +75,8 @@ const AdminConsultancyRequests = () => {
         setConsultancies((prev) =>
           prev.filter(
             (req) =>
-              !(req.userId === userId && req.consultancyId === consultancyId)
-          )
+              !(req.userId === userId && req.consultancyId === consultancyId),
+          ),
         );
       } else {
         alert("Failed to update status");

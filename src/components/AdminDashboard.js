@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut } from 'lucide-react';
+import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon } from 'lucide-react';
 import logo from "../images/logo-1.png"
 import { useNavigate } from 'react-router-dom';
 
@@ -143,6 +143,10 @@ function AdminDashboard() {
         navigate("/admintransaction")
     }
 
+    function goLandingPageOrders(){
+         navigate("/adminlandingpage")
+    }
+
     const menuItems = [
         {
             title: 'Help Requests',
@@ -185,6 +189,12 @@ function AdminDashboard() {
             icon:ListOrdered,
             onClick: goOrderUpdate,
             description: 'Download Orders Bills'
+        },
+        {
+            title: 'Landing Page Orders',
+            icon:Moon,
+            onClick: goLandingPageOrders,
+            description: 'Landing Page Orders'
         },
         {
             title: 'Admin Online Store Dashboard',

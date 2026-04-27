@@ -1,10 +1,13 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import API_BASE_URL from "./apiConfig"
 
 const HelpSection = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -140,6 +143,10 @@ const HelpSection = () => {
     }
   };
 
+  const handleMyRequestsClick = () => {
+    navigate('/myhelprequest');
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
@@ -160,7 +167,8 @@ const HelpSection = () => {
       background: 'linear-gradient(316deg, rgb(42 101 197) 0%, rgb(10 80 177) 100%)',
       padding: '3rem 2rem',
       textAlign: 'center',
-      color: 'white'
+      color: 'white',
+      position: 'relative'
     },
     headerTitle: {
       fontSize: '2.8rem',
@@ -174,6 +182,29 @@ const HelpSection = () => {
       opacity: '0.9',
       fontWeight: '300',
       color: '#d1d5db'
+    },
+    myRequestsButton: {
+      position: 'absolute',
+      top: '2rem',
+      right: '2rem',
+      background: 'rgba(255, 255, 255, 0.2)',
+      backdropFilter: 'blur(10px)',
+      color: 'white',
+      padding: '0.75rem 1.5rem',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      borderRadius: '10px',
+      fontSize: '1rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      textDecoration: 'none',
+      display: 'inline-block',
+      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
+    },
+    myRequestsButtonHover: {
+      background: 'rgba(255, 255, 255, 0.3)',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)'
     },
     formContainer: {
       padding: '3rem 2.5rem',
@@ -372,6 +403,7 @@ const HelpSection = () => {
 
   const [hoveredButton, setHoveredButton] = useState(false);
   const [hoveredWhatsApp, setHoveredWhatsApp] = useState(false);
+  const [hoveredRequestsButton, setHoveredRequestsButton] = useState(false);
   const [focusedInput, setFocusedInput] = useState('');
   const [hoveredCards, setHoveredCards] = useState({});
 
@@ -400,6 +432,17 @@ const HelpSection = () => {
             }
             .help-col {
               min-width: 100% !important;
+            }
+            .my-requests-btn {
+              position: static !important;
+              margin-top: 1rem !important;
+              display: inline-block !important;
+            }
+            .header-content {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 1rem;
             }
           }
 
@@ -447,10 +490,24 @@ const HelpSection = () => {
       
       <div style={styles.mainCard}>
         <div style={styles.header}>
-          <h2 style={styles.headerTitle}>Need Help?</h2>
-          <p style={styles.headerSubtitle}>
-            We're here to assist you. Fill out the form below and our support team will reach out to you.
-          </p>
+          <div className="header-content">
+            <h2 style={styles.headerTitle}>Need Help?</h2>
+            <p style={styles.headerSubtitle}>
+              We're here to assist you. Fill out the form below and our support team will reach out to you.
+            </p>
+          </div>
+          <button
+            onClick={handleMyRequestsClick}
+            onMouseEnter={() => setHoveredRequestsButton(true)}
+            onMouseLeave={() => setHoveredRequestsButton(false)}
+            className="my-requests-btn"
+            style={{
+              ...styles.myRequestsButton,
+              ...(hoveredRequestsButton ? styles.myRequestsButtonHover : {})
+            }}
+          >
+            My Requests
+          </button>
         </div>
 
         <div style={styles.formContainer}>
