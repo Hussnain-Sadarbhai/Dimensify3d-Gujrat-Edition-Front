@@ -5,20 +5,36 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
 import { CuraWASM } from "cura-wasm";
 import { resolveDefinition } from "cura-wasm-definitions";
-import { Container, Row, Col, Card, Button, Form, Badge, Alert, ProgressBar, Modal, Collapse, Spinner } from 'react-bootstrap';
-import Header from "./Header"
-import "./slicer.css"
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Form,
+  Badge,
+  Alert,
+  ProgressBar,
+  Modal,
+  Collapse,
+  Spinner,
+} from "react-bootstrap";
+import Header from "./Header";
+import "./slicer.css";
 import API_BASE_URL from "./apiConfig";
-import { useNavigate } from 'react-router-dom';
-import { openDB } from 'idb';
+import { useNavigate } from "react-router-dom";
+import { openDB } from "idb";
 import Footer from "./Footer";
 
 // Initialize IndexedDB
 const initDB = async () => {
-  return await openDB('dimensify-stl-db', 1, {
+  return await openDB("dimensify-stl-db", 1, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains('checkout-files')) {
-        db.createObjectStore('checkout-files', { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains("checkout-files")) {
+        db.createObjectStore("checkout-files", {
+          keyPath: "id",
+          autoIncrement: true,
+        });
       }
     },
   });
@@ -26,9 +42,9 @@ const initDB = async () => {
 
 // Maximum allowed dimensions (in mm)
 const MAX_DIMENSIONS = {
-  width: 220,
-  height: 220,
-  depth: 250
+  width: 256,
+  height: 256,
+  depth: 256,
 };
 
 // STL Model Viewer Component
@@ -46,7 +62,7 @@ const STLModel = ({ file, position, rotation, onDimensionsLoad }) => {
       onDimensionsLoad({
         width: size.x.toFixed(2),
         height: size.z.toFixed(2), // Z is height in 3D space
-        depth: size.y.toFixed(2)
+        depth: size.y.toFixed(2),
       });
     }
   }, [size.x, size.y, size.z, onDimensionsLoad]);
@@ -80,50 +96,122 @@ function buildOverrides(user) {
   ];
 
   if (user.layerHeight && user.layerHeight !== 0.15) {
-    overrides.push({ scope: undefined, key: "layer_height", value: user.layerHeight });
-    overrides.push({ scope: undefined, key: "initial_layer_height", value: user.layerHeight * 1.5 });
+    overrides.push({
+      scope: undefined,
+      key: "layer_height",
+      value: user.layerHeight,
+    });
+    overrides.push({
+      scope: undefined,
+      key: "initial_layer_height",
+      value: user.layerHeight * 1.5,
+    });
   } else if (user.layerHeight === 0.15) {
     overrides.push({ scope: undefined, key: "layer_height", value: 0.15 });
-    overrides.push({ scope: undefined, key: "initial_layer_height", value: 0.2 });
+    overrides.push({
+      scope: undefined,
+      key: "initial_layer_height",
+      value: 0.2,
+    });
   }
 
   if (user.infillDensity !== undefined && user.infillDensity !== null) {
-    overrides.push({ scope: undefined, key: "infill_sparse_density", value: user.infillDensity });
+    overrides.push({
+      scope: undefined,
+      key: "infill_sparse_density",
+      value: user.infillDensity,
+    });
   } else {
-    overrides.push({ scope: undefined, key: "infill_sparse_density", value: 20 });
+    overrides.push({
+      scope: undefined,
+      key: "infill_sparse_density",
+      value: 20,
+    });
   }
 
   if (user.infillPattern) {
-    overrides.push({ scope: undefined, key: "infill_pattern", value: user.infillPattern });
+    overrides.push({
+      scope: undefined,
+      key: "infill_pattern",
+      value: user.infillPattern,
+    });
   }
 
   if (user.supportEnable !== undefined) {
-    overrides.push({ scope: undefined, key: "support_enable", value: user.supportEnable });
+    overrides.push({
+      scope: undefined,
+      key: "support_enable",
+      value: user.supportEnable,
+    });
     if (user.supportEnable) {
-      overrides.push({ scope: undefined, key: "support_type", value: "buildplate" });
+      overrides.push({
+        scope: undefined,
+        key: "support_type",
+        value: "buildplate",
+      });
       overrides.push({ scope: undefined, key: "support_angle", value: 50 });
-      overrides.push({ scope: undefined, key: "support_infill_rate", value: 15 });
+      overrides.push({
+        scope: undefined,
+        key: "support_infill_rate",
+        value: 15,
+      });
     }
   }
 
   if (user.materialType) {
     switch (user.materialType.toLowerCase()) {
       case "pla":
-        overrides.push({ scope: undefined, key: "material_print_temperature", value: 210 });
-        overrides.push({ scope: undefined, key: "material_bed_temperature", value: 60 });
-        overrides.push({ scope: undefined, key: "retraction_amount", value: 6.5 });
+        overrides.push({
+          scope: undefined,
+          key: "material_print_temperature",
+          value: 210,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "material_bed_temperature",
+          value: 60,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "retraction_amount",
+          value: 6.5,
+        });
         overrides.push({ scope: undefined, key: "speed_print", value: 80 });
         break;
       case "pla+":
-        overrides.push({ scope: undefined, key: "material_print_temperature", value: 220 });
-        overrides.push({ scope: undefined, key: "material_bed_temperature", value: 70 });
-        overrides.push({ scope: undefined, key: "retraction_amount", value: 6.5 });
+        overrides.push({
+          scope: undefined,
+          key: "material_print_temperature",
+          value: 220,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "material_bed_temperature",
+          value: 70,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "retraction_amount",
+          value: 6.5,
+        });
         overrides.push({ scope: undefined, key: "speed_print", value: 75 });
         break;
       case "abs":
-        overrides.push({ scope: undefined, key: "material_print_temperature", value: 250 });
-        overrides.push({ scope: undefined, key: "material_bed_temperature", value: 100 });
-        overrides.push({ scope: undefined, key: "retraction_amount", value: 4.5 });
+        overrides.push({
+          scope: undefined,
+          key: "material_print_temperature",
+          value: 250,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "material_bed_temperature",
+          value: 100,
+        });
+        overrides.push({
+          scope: undefined,
+          key: "retraction_amount",
+          value: 4.5,
+        });
         overrides.push({ scope: undefined, key: "speed_print", value: 70 });
         break;
       default:
@@ -132,7 +220,11 @@ function buildOverrides(user) {
   }
 
   if (user.materialColor) {
-    overrides.push({ scope: undefined, key: "material_colour", value: user.materialColor });
+    overrides.push({
+      scope: undefined,
+      key: "material_colour",
+      value: user.materialColor,
+    });
   }
 
   overrides.push({ scope: undefined, key: "retraction_enable", value: true });
@@ -223,12 +315,12 @@ const STLSlicer = () => {
 
   // CHANGED: Load only file metadata from localStorage (not actual files)
   useEffect(() => {
-    const savedStlFiles = localStorage.getItem('stlFiles');
+    const savedStlFiles = localStorage.getItem("stlFiles");
     if (savedStlFiles) {
       try {
         const parsedFiles = JSON.parse(savedStlFiles);
         // Only store metadata, not actual file data
-        const fileMetadata = parsedFiles.map(fileData => ({
+        const fileMetadata = parsedFiles.map((fileData) => ({
           name: fileData.file?.name,
           size: fileData.file?.size,
           quantity: fileData.quantity,
@@ -238,11 +330,11 @@ const STLSlicer = () => {
           specialNotes: fileData.specialNotes,
           unitPrice: fileData.unitPrice,
           totalPrice: fileData.totalPrice,
-          timestamp: fileData.timestamp
+          timestamp: fileData.timestamp,
         }));
         setStlFiles(fileMetadata);
       } catch (error) {
-        console.error('Error loading STL files from localStorage:', error);
+        console.error("Error loading STL files from localStorage:", error);
       }
     }
   }, []);
@@ -250,7 +342,7 @@ const STLSlicer = () => {
   const loadFileFromStorage = (fileData) => {
     // This function is kept for compatibility but won't load actual files
     // since we don't store them in localStorage anymore
-    console.log('File loading from storage not supported for large files');
+    console.log("File loading from storage not supported for large files");
   };
 
   const fetchAvailableCoupons = async () => {
@@ -281,26 +373,26 @@ const STLSlicer = () => {
           const orders = userData.data.orders;
           // Extract all appliedCoupon names from orders
           usedCoupons = Object.values(orders)
-            .map(order => order.appliedCoupon?.name)
+            .map((order) => order.appliedCoupon?.name)
             .filter(Boolean); // remove undefined/null
         }
 
         // 3️⃣ Filter only active, public coupons and not already used
-        const activeCoupons = data.data.filter(coupon => {
+        const activeCoupons = data.data.filter((coupon) => {
           const expiryDate = new Date(coupon.expiry);
           const today = new Date();
 
           return (
-            expiryDate >= today &&                // not expired
-            coupon.public !== false &&            // public coupons only
-            !usedCoupons.includes(coupon.name)    // not used by user
+            expiryDate >= today && // not expired
+            coupon.public !== false && // public coupons only
+            !usedCoupons.includes(coupon.name) // not used by user
           );
         });
 
         setAvailableCoupons(activeCoupons);
 
         // 4️⃣ Keep all active coupons (public + private) for validation
-        const allActiveCoupons = data.data.filter(coupon => {
+        const allActiveCoupons = data.data.filter((coupon) => {
           const expiryDate = new Date(coupon.expiry);
           const today = new Date();
           return expiryDate >= today; // still active
@@ -323,8 +415,8 @@ const STLSlicer = () => {
     }
 
     // Find the coupon in ALL available coupons (including private ones)
-    const coupon = allCoupons.find(c =>
-      c.name.toLowerCase() === couponInput.toLowerCase()
+    const coupon = allCoupons.find(
+      (c) => c.name.toLowerCase() === couponInput.toLowerCase(),
     );
 
     if (!coupon) {
@@ -355,13 +447,13 @@ const STLSlicer = () => {
       });
 
       const userData = await userRes.json();
-      
+
       if (userData.success && userData.data?.orders) {
         const orders = userData.data.orders;
         const usedCoupons = Object.values(orders)
-          .map(order => order.appliedCoupon?.name)
+          .map((order) => order.appliedCoupon?.name)
           .filter(Boolean);
-        
+
         if (usedCoupons.includes(coupon.name)) {
           setCouponError("You have already used this coupon before");
           return;
@@ -393,20 +485,20 @@ const STLSlicer = () => {
   // Calculate subtotal for all files (before coupon)
   const calculateSubtotal = () => {
     let total = 0;
-    
+
     // Add current file price if it exists
     if (printInfo) {
       total += printInfo.pricing.finalPrice * quantity;
     }
-    
+
     // Add prices of all other files in storage
-    stlFiles.forEach(fileData => {
+    stlFiles.forEach((fileData) => {
       if (fileData.pricing) {
         const filePrice = fileData.pricing.finalPrice * fileData.quantity;
         total += filePrice;
       }
     });
-    
+
     return total;
   };
 
@@ -447,7 +539,11 @@ const STLSlicer = () => {
   };
 
   // Function to get filament correction factor
-  const getFilamentCorrectionFactor = (materialType, infillDensity, supportEnable) => {
+  const getFilamentCorrectionFactor = (
+    materialType,
+    infillDensity,
+    supportEnable,
+  ) => {
     const material = materialType.toLowerCase();
 
     if (supportEnable) {
@@ -459,21 +555,33 @@ const STLSlicer = () => {
     } else {
       if (material === "pla" || material === "pla+") {
         switch (infillDensity) {
-          case 20: return 1.62;
-          case 40: return 1.0;
-          case 60: return 0.72;
-          case 80: return 0.56;
-          case 100: return 0.49;
-          default: return 1.0;
+          case 20:
+            return 1.62;
+          case 40:
+            return 1.0;
+          case 60:
+            return 0.72;
+          case 80:
+            return 0.56;
+          case 100:
+            return 0.49;
+          default:
+            return 1.0;
         }
       } else if (material === "abs") {
         switch (infillDensity) {
-          case 20: return 1.5;
-          case 40: return 0.96;
-          case 60: return 0.69;
-          case 80: return 0.54;
-          case 100: return 0.47;
-          default: return 1.0;
+          case 20:
+            return 1.5;
+          case 40:
+            return 0.96;
+          case 60:
+            return 0.69;
+          case 80:
+            return 0.54;
+          case 100:
+            return 0.47;
+          default:
+            return 1.0;
         }
       }
     }
@@ -497,20 +605,22 @@ const STLSlicer = () => {
     const timeCost = roundedHours * 2;
     const packagingCost = 15;
 
-    console.log(`Filament cost: ${filamentCost} Rs (${roundedFilamentGrams}g × 1 Rs/g)`);
+    console.log(
+      `Filament cost: ${filamentCost} Rs (${roundedFilamentGrams}g × 1 Rs/g)`,
+    );
     console.log(`Time cost: ${timeCost} Rs (${roundedHours}h × 2 Rs/h)`);
     console.log(`Packaging cost: ${packagingCost} Rs (fixed)`);
 
     const subtotal = filamentCost + timeCost + packagingCost;
     console.log(`Subtotal: ${subtotal} Rs`);
 
-    const humanEffortsCost = subtotal * 0.20;
+    const humanEffortsCost = subtotal * 0.2;
     console.log(`Human efforts (10%): ${humanEffortsCost} Rs`);
 
     const totalBeforeProfit = subtotal + humanEffortsCost;
     console.log(`Total before profit: ${totalBeforeProfit} Rs`);
 
-    const profitCost = subtotal * 0.50;
+    const profitCost = subtotal * 0.5;
     console.log(`Profit (25% of base costs): ${profitCost} Rs`);
 
     const finalPrice = totalBeforeProfit + profitCost;
@@ -529,8 +639,8 @@ const STLSlicer = () => {
         hours: roundedHours,
         subtotal,
         totalBeforeProfit,
-        finalPrice: Math.round(finalPrice)
-      }
+        finalPrice: Math.round(finalPrice),
+      },
     };
   };
 
@@ -561,7 +671,9 @@ const STLSlicer = () => {
     setDimensionsValid(isValid);
 
     if (!isValid) {
-      setError("STL file dimensions exceed maximum allowed limits. Please resize your model or split it into smaller parts.");
+      setError(
+        "STL file dimensions exceed maximum allowed limits. Please resize your model or split it into smaller parts.",
+      );
     } else {
       setError("");
     }
@@ -570,8 +682,8 @@ const STLSlicer = () => {
   const handleSettingChange = (key, value) => {
     let newSettings = { ...userSettings, [key]: value };
 
-    if (key === 'materialType') {
-      const selectedMaterial = materialOptions.find(m => m.value === value);
+    if (key === "materialType") {
+      const selectedMaterial = materialOptions.find((m) => m.value === value);
       if (selectedMaterial) {
         newSettings.materialColor = selectedMaterial.color;
       }
@@ -588,7 +700,8 @@ const STLSlicer = () => {
 
   const formatTime = (seconds) => {
     if (!seconds || seconds === "N/A") return "N/A";
-    const numSeconds = typeof seconds === 'string' ? parseFloat(seconds) : seconds;
+    const numSeconds =
+      typeof seconds === "string" ? parseFloat(seconds) : seconds;
     if (isNaN(numSeconds)) return "N/A";
 
     const hrs = Math.floor(numSeconds / 3600);
@@ -607,7 +720,9 @@ const STLSlicer = () => {
   // CHANGED: Save current file metadata to state (not localStorage)
   const handleAddAnotherSTL = async () => {
     if (!file || !printInfo) {
-      setError("Please complete the current file analysis before adding another STL file");
+      setError(
+        "Please complete the current file analysis before adding another STL file",
+      );
       return;
     }
 
@@ -618,17 +733,17 @@ const STLSlicer = () => {
       // Scroll to top to show saving state
       window.scrollTo({
         top: 0,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
 
       // Initialize IndexedDB
       const db = await initDB();
-      
+
       // Convert file to ArrayBuffer for storage
-      console.log('Converting file to ArrayBuffer...');
+      console.log("Converting file to ArrayBuffer...");
       const arrayBuffer = await file.arrayBuffer();
-      console.log('ArrayBuffer size:', arrayBuffer.byteLength);
-      
+      console.log("ArrayBuffer size:", arrayBuffer.byteLength);
+
       // Store complete file data in IndexedDB
       const fileRecord = {
         fileName: file.name,
@@ -642,31 +757,31 @@ const STLSlicer = () => {
           infillPattern: userSettings.infillPattern,
           supportEnable: userSettings.supportEnable,
           materialType: userSettings.materialType,
-          materialColor: userSettings.materialColor
+          materialColor: userSettings.materialColor,
         },
         dimensions: {
           height: printInfo?.height || stlDimensions?.height || "N/A",
           width: printInfo?.width || stlDimensions?.width || "N/A",
-          depth: printInfo?.depth || stlDimensions?.depth || "N/A"
+          depth: printInfo?.depth || stlDimensions?.depth || "N/A",
         },
         pricing: printInfo?.pricing,
         printDetails: {
           filamentUsedGrams: printInfo?.filamentUsedGrams,
           filamentUsedMm: printInfo?.filamentUsedMm,
-          volume: printInfo?.volume
+          volume: printInfo?.volume,
         },
         modelPosition: [...modelPosition],
         modelRotation: [...modelRotation],
         specialNotes: specialNotes,
         unitPrice: printInfo?.pricing?.finalPrice || 0,
         totalPrice: (printInfo?.pricing?.finalPrice || 0) * quantity,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // Store in IndexedDB and get the ID
-      const fileId = await db.add('checkout-files', fileRecord);
-      console.log('File stored in IndexedDB with ID:', fileId);
-      
+      const fileId = await db.add("checkout-files", fileRecord);
+      console.log("File stored in IndexedDB with ID:", fileId);
+
       // Create metadata for UI display (with the IndexedDB ID)
       const fileMetadata = {
         id: fileId, // CRITICAL: Store the IndexedDB ID
@@ -680,14 +795,14 @@ const STLSlicer = () => {
         specialNotes: specialNotes,
         unitPrice: fileRecord.unitPrice,
         totalPrice: fileRecord.totalPrice,
-        timestamp: fileRecord.timestamp
+        timestamp: fileRecord.timestamp,
       };
 
       const updatedFiles = [...stlFiles, fileMetadata];
       setStlFiles(updatedFiles);
-      
+
       // Store only metadata in localStorage for UI purposes
-      const metadataOnly = updatedFiles.map(file => ({
+      const metadataOnly = updatedFiles.map((file) => ({
         id: file.id, // Keep IndexedDB ID
         name: file.name,
         size: file.size,
@@ -699,9 +814,9 @@ const STLSlicer = () => {
         specialNotes: file.specialNotes,
         unitPrice: file.unitPrice,
         totalPrice: file.totalPrice,
-        timestamp: file.timestamp
+        timestamp: file.timestamp,
       }));
-      localStorage.setItem('stlFiles', JSON.stringify(metadataOnly));
+      localStorage.setItem("stlFiles", JSON.stringify(metadataOnly));
 
       // Reset form
       setFile(null);
@@ -723,30 +838,29 @@ const STLSlicer = () => {
       setSpecialNotes("");
       setError("");
 
-      const fileInput = document.getElementById('stl-file-input');
+      const fileInput = document.getElementById("stl-file-input");
       if (fileInput) {
-        fileInput.value = '';
+        fileInput.value = "";
       }
 
       setError(`File saved successfully! You can now add another STL file.`);
-      
+
       // Scroll to file input section after saving
       setTimeout(() => {
         fileInputRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
+          behavior: "smooth",
+          block: "start",
         });
         setTimeout(() => {
           window.scrollBy({
             top: -100,
-            behavior: 'smooth'
+            behavior: "smooth",
           });
         }, 600);
       }, 500);
-
     } catch (error) {
-      console.error('Error saving STL file:', error);
-      setError('Error saving STL file. Please try again.');
+      console.error("Error saving STL file:", error);
+      setError("Error saving STL file. Please try again.");
     } finally {
       setIsAddingFile(false);
     }
@@ -756,9 +870,9 @@ const STLSlicer = () => {
   const handleRemoveFile = (index) => {
     const updatedFiles = stlFiles.filter((_, i) => i !== index);
     setStlFiles(updatedFiles);
-    
+
     // Update localStorage with metadata only
-    const metadataOnly = updatedFiles.map(file => ({
+    const metadataOnly = updatedFiles.map((file) => ({
       name: file.name,
       size: file.size,
       quantity: file.quantity,
@@ -768,10 +882,10 @@ const STLSlicer = () => {
       specialNotes: file.specialNotes,
       unitPrice: file.unitPrice,
       totalPrice: file.totalPrice,
-      timestamp: file.timestamp
+      timestamp: file.timestamp,
     }));
-    localStorage.setItem('stlFiles', JSON.stringify(metadataOnly));
-    
+    localStorage.setItem("stlFiles", JSON.stringify(metadataOnly));
+
     // If we removed the current file, clear the form
     if (index === currentFileIndex) {
       setFile(null);
@@ -801,7 +915,9 @@ const STLSlicer = () => {
       const overrides = buildOverrides(userSettings);
       console.log("Generated overrides:", overrides);
 
-      const infillOverride = overrides.find(o => o.key === "infill_sparse_density");
+      const infillOverride = overrides.find(
+        (o) => o.key === "infill_sparse_density",
+      );
       console.log("Infill override found:", infillOverride);
 
       const slicer = new CuraWASM({
@@ -810,7 +926,7 @@ const STLSlicer = () => {
         verbose: true,
       });
 
-      slicer.on('progress', (percent) => {
+      slicer.on("progress", (percent) => {
         setProgress(percent);
         console.log(`Slicing progress: ${percent}%`);
       });
@@ -825,9 +941,11 @@ const STLSlicer = () => {
       console.log("Metadata:", result.metadata);
 
       if (result.metadata) {
-        const filamentMm = result.metadata.filamentUsage ||
+        const filamentMm =
+          result.metadata.filamentUsage ||
           result.metadata.material1Usage ||
-          result.metadata.filament_used || 0;
+          result.metadata.filament_used ||
+          0;
 
         let materialDensity = 1.24;
         switch (userSettings.materialType?.toLowerCase()) {
@@ -849,12 +967,14 @@ const STLSlicer = () => {
         const correctionFactor = getFilamentCorrectionFactor(
           userSettings.materialType,
           userSettings.infillDensity,
-          userSettings.supportEnable
+          userSettings.supportEnable,
         );
         const correctedFilamentGrams = filamentGrams / correctionFactor;
 
         console.log(`Correction factor applied: ${correctionFactor}`);
-        console.log(`Original weight: ${filamentGrams.toFixed(2)}g, Corrected: ${correctedFilamentGrams.toFixed(2)}g`);
+        console.log(
+          `Original weight: ${filamentGrams.toFixed(2)}g, Corrected: ${correctedFilamentGrams.toFixed(2)}g`,
+        );
 
         const info = {
           filamentUsedMm: filamentMm,
@@ -869,13 +989,19 @@ const STLSlicer = () => {
           infillDensity: userSettings.infillDensity,
         };
 
-        const timeInSeconds = result.metadata.printTime || result.metadata.print_time || result.metadata.estimated_time || 0;
+        const timeInSeconds =
+          result.metadata.printTime ||
+          result.metadata.print_time ||
+          result.metadata.estimated_time ||
+          0;
         const pricing = calculatePrice(correctedFilamentGrams, timeInSeconds);
 
         info.pricing = pricing;
 
         console.log("=== PRINT ANALYSIS COMPLETE ===");
-        console.log(`- Filament Used: ${(info.filamentUsedMm / 1000).toFixed(2)} m`);
+        console.log(
+          `- Filament Used: ${(info.filamentUsedMm / 1000).toFixed(2)} m`,
+        );
         console.log(`- Filament Weight: ${info.filamentUsedGrams} g`);
         console.log("Model Dimensions:");
         console.log(`- Height: ${info.height} mm`);
@@ -893,11 +1019,10 @@ const STLSlicer = () => {
         // Scroll to pricing section after slicing is complete
         setTimeout(() => {
           pricingSectionRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+            behavior: "smooth",
+            block: "start",
           });
         }, 500);
-
       } else {
         console.warn("No metadata received from slicing operation");
         const defaultInfo = {
@@ -921,14 +1046,13 @@ const STLSlicer = () => {
         // Scroll to pricing section
         setTimeout(() => {
           pricingSectionRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+            behavior: "smooth",
+            block: "start",
           });
         }, 500);
       }
 
       slicer.dispose();
-
     } catch (err) {
       console.error("Slicing error:", err);
       setError(`Slicing failed: ${err.message}`);
@@ -939,49 +1063,56 @@ const STLSlicer = () => {
   };
 
   const handlePayNow = async () => {
-    console.log('=== handlePayNow START ===');
-    
+    console.log("=== handlePayNow START ===");
+
     try {
       setIsCheckingOut(true);
-      setError('Preparing checkout...');
+      setError("Preparing checkout...");
 
       // Scroll to top to show loading state
       window.scrollTo({
         top: 0,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
-      
+
       // Initialize IndexedDB
-      console.log('Initializing database...');
+      console.log("Initializing database...");
       const db = await initDB();
-      console.log('Database initialized');
+      console.log("Database initialized");
 
       const storedFileIds = [];
-      
+
       // Collect IDs from previously saved files
-      console.log('Loading saved files:', stlFiles.length);
+      console.log("Loading saved files:", stlFiles.length);
       for (const fileMetadata of stlFiles) {
         if (fileMetadata.id) {
           // Verify file exists in IndexedDB
-          const existingFile = await db.get('checkout-files', fileMetadata.id);
+          const existingFile = await db.get("checkout-files", fileMetadata.id);
           if (existingFile && existingFile.fileArrayBuffer) {
             storedFileIds.push(fileMetadata.id);
-            console.log('Using existing file ID:', fileMetadata.id, 'Size:', existingFile.fileArrayBuffer.byteLength);
+            console.log(
+              "Using existing file ID:",
+              fileMetadata.id,
+              "Size:",
+              existingFile.fileArrayBuffer.byteLength,
+            );
           } else {
-            console.error('File not found in IndexedDB:', fileMetadata.id);
-            setError(`File "${fileMetadata.name}" not found. Please re-add this file.`);
+            console.error("File not found in IndexedDB:", fileMetadata.id);
+            setError(
+              `File "${fileMetadata.name}" not found. Please re-add this file.`,
+            );
             setIsCheckingOut(false);
             return;
           }
         }
       }
-      
+
       // Add current file if exists
       if (file && printInfo) {
-        console.log('Storing current file:', file.name);
+        console.log("Storing current file:", file.name);
         const arrayBuffer = await file.arrayBuffer();
-        console.log('Current file ArrayBuffer size:', arrayBuffer.byteLength);
-        
+        console.log("Current file ArrayBuffer size:", arrayBuffer.byteLength);
+
         const fileRecord = {
           fileName: file.name,
           fileType: file.type,
@@ -994,37 +1125,37 @@ const STLSlicer = () => {
             infillPattern: userSettings.infillPattern,
             supportEnable: userSettings.supportEnable,
             materialType: userSettings.materialType,
-            materialColor: userSettings.materialColor
+            materialColor: userSettings.materialColor,
           },
           dimensions: {
             height: printInfo?.height || stlDimensions?.height || "N/A",
             width: printInfo?.width || stlDimensions?.width || "N/A",
-            depth: printInfo?.depth || stlDimensions?.depth || "N/A"
+            depth: printInfo?.depth || stlDimensions?.depth || "N/A",
           },
           pricing: printInfo?.pricing,
           printDetails: {
             filamentUsedGrams: printInfo?.filamentUsedGrams,
             filamentUsedMm: printInfo?.filamentUsedMm,
-            volume: printInfo?.volume
+            volume: printInfo?.volume,
           },
           modelPosition: [...modelPosition],
           modelRotation: [...modelRotation],
           specialNotes: specialNotes,
           unitPrice: printInfo?.pricing?.finalPrice || 0,
           totalPrice: (printInfo?.pricing?.finalPrice || 0) * quantity,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
-        
-        const id = await db.add('checkout-files', fileRecord);
+
+        const id = await db.add("checkout-files", fileRecord);
         storedFileIds.push(id);
-        console.log('Current file stored with ID:', id);
+        console.log("Current file stored with ID:", id);
       }
 
-      console.log('Total files for checkout:', storedFileIds.length);
-      console.log('All file IDs:', storedFileIds);
+      console.log("Total files for checkout:", storedFileIds.length);
+      console.log("All file IDs:", storedFileIds);
 
       if (storedFileIds.length === 0) {
-        setError('No files to checkout. Please add at least one STL file.');
+        setError("No files to checkout. Please add at least one STL file.");
         setIsCheckingOut(false);
         return;
       }
@@ -1034,51 +1165,52 @@ const STLSlicer = () => {
       const discountAmount = getDiscountAmount();
       const finalTotal = calculateFinalPrice();
 
-      console.log('Totals:', { subtotal, discountAmount, finalTotal });
+      console.log("Totals:", { subtotal, discountAmount, finalTotal });
 
       // Prepare checkout data with file IDs
       const checkoutData = {
         fileIds: storedFileIds, // Array of IndexedDB IDs
         fileCount: storedFileIds.length,
         subtotal: subtotal,
-        appliedCoupon: appliedCoupon ? {
-          name: appliedCoupon.name,
-          discount: appliedCoupon.discount,
-          id: appliedCoupon.id
-        } : null,
+        appliedCoupon: appliedCoupon
+          ? {
+              name: appliedCoupon.name,
+              discount: appliedCoupon.discount,
+              id: appliedCoupon.id,
+            }
+          : null,
         discountAmount: discountAmount,
         totalPrice: finalTotal,
-        orderTimestamp: new Date().toISOString()
+        orderTimestamp: new Date().toISOString(),
       };
 
-      console.log('Checkout data prepared:', checkoutData);
-      console.log('Storing checkout data in sessionStorage...');
-      sessionStorage.setItem('checkoutData', JSON.stringify(checkoutData));
-      
+      console.log("Checkout data prepared:", checkoutData);
+      console.log("Storing checkout data in sessionStorage...");
+      sessionStorage.setItem("checkoutData", JSON.stringify(checkoutData));
+
       // Wait for sessionStorage to be written
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Verify storage
-      const verifyData = sessionStorage.getItem('checkoutData');
+      const verifyData = sessionStorage.getItem("checkoutData");
       if (!verifyData) {
-        throw new Error('Failed to store checkout data in sessionStorage');
+        throw new Error("Failed to store checkout data in sessionStorage");
       }
-      console.log('Checkout data verified in sessionStorage');
+      console.log("Checkout data verified in sessionStorage");
 
       // Clear localStorage after successful storage
-      localStorage.removeItem('stlFiles');
+      localStorage.removeItem("stlFiles");
       setStlFiles([]);
-      console.log('Local storage cleaned');
+      console.log("Local storage cleaned");
 
-      console.log('Navigating to checkout...');
-      console.log('=== handlePayNow END ===');
-      
+      console.log("Navigating to checkout...");
+      console.log("=== handlePayNow END ===");
+
       // Navigate using window.location for guaranteed page transition
-      window.location.href = '/checkout';
-
+      window.location.href = "/checkout";
     } catch (error) {
-      console.error('Error in handlePayNow:', error);
-      console.error('Error stack:', error.stack);
+      console.error("Error in handlePayNow:", error);
+      console.error("Error stack:", error.stack);
       setError(`Failed to prepare checkout: ${error.message}`);
       setIsCheckingOut(false);
     }
@@ -1091,7 +1223,15 @@ const STLSlicer = () => {
     <>
       <Header />
 
-      <div id="stl-slicer-section" style={{ background: 'linear-gradient(135deg, #f5f5f5 0%, #e9edf2 25%, #dce2e8 50%, #cfd6dd 75%, #e9edf2 100%)', minHeight: '100vh', paddingTop: '2rem' }}>
+      <div
+        id="stl-slicer-section"
+        style={{
+          background:
+            "linear-gradient(135deg, #f5f5f5 0%, #e9edf2 25%, #dce2e8 50%, #cfd6dd 75%, #e9edf2 100%)",
+          minHeight: "100vh",
+          paddingTop: "2rem",
+        }}
+      >
         <Container fluid className="px-4">
           {/* Tutorial Banner */}
           <Row className="mb-4">
@@ -1130,8 +1270,10 @@ const STLSlicer = () => {
                         {isCheckingOut && "Preparing checkout..."}
                       </strong>
                       <div className="small mt-1">
-                        {isAddingFile && "Please wait while we save your file and prepare for the next upload..."}
-                        {isCheckingOut && "Please wait while we prepare your order for checkout..."}
+                        {isAddingFile &&
+                          "Please wait while we save your file and prepare for the next upload..."}
+                        {isCheckingOut &&
+                          "Please wait while we prepare your order for checkout..."}
                       </div>
                     </div>
                   </div>
@@ -1147,7 +1289,8 @@ const STLSlicer = () => {
                 <Card className="professional-card border border-primary shadow-sm">
                   <Card.Body>
                     <h5 className="section-title text-primary">
-                      <i className="fas fa-folder me-2"></i>Saved STL Files ({stlFiles.length})
+                      <i className="fas fa-folder me-2"></i>Saved STL Files (
+                      {stlFiles.length})
                     </h5>
                     <Row>
                       {stlFiles.map((fileData, index) => (
@@ -1155,7 +1298,10 @@ const STLSlicer = () => {
                           <Card className="h-100 border-primary">
                             <Card.Body className="p-3">
                               <div className="d-flex justify-content-between align-items-start mb-2">
-                                <h6 className="fw-bold text-truncate mb-0" title={fileData.name}>
+                                <h6
+                                  className="fw-bold text-truncate mb-0"
+                                  title={fileData.name}
+                                >
                                   {fileData.name || `File ${index + 1}`}
                                 </h6>
                                 <Badge bg="primary" className="ms-2">
@@ -1163,10 +1309,13 @@ const STLSlicer = () => {
                                 </Badge>
                               </div>
                               <div className="small text-muted mb-2">
-                                Material: {fileData.printSettings?.materialType?.toUpperCase()}
+                                Material:{" "}
+                                {fileData.printSettings?.materialType?.toUpperCase()}
                               </div>
                               <div className="small text-muted mb-3">
-                                Price: ₹{(fileData.pricing?.finalPrice || 0) * fileData.quantity}
+                                Price: ₹
+                                {(fileData.pricing?.finalPrice || 0) *
+                                  fileData.quantity}
                               </div>
                               <div className="d-flex gap-2">
                                 <Button
@@ -1186,7 +1335,9 @@ const STLSlicer = () => {
                     <div className="mt-3 p-3 bg-light rounded">
                       <div className="d-flex justify-content-between align-items-center">
                         <strong>Subtotal for all saved files:</strong>
-                        <span className="h5 mb-0 text-primary">₹{calculateSubtotal()}</span>
+                        <span className="h5 mb-0 text-primary">
+                          ₹{calculateSubtotal()}
+                        </span>
                       </div>
                       {appliedCoupon && (
                         <>
@@ -1195,12 +1346,16 @@ const STLSlicer = () => {
                               <i className="fas fa-tag me-1"></i>
                               Discount ({appliedCoupon.discount}%):
                             </span>
-                            <span className="h6 mb-0 text-success">-₹{getDiscountAmount()}</span>
+                            <span className="h6 mb-0 text-success">
+                              -₹{getDiscountAmount()}
+                            </span>
                           </div>
                           <hr className="my-2" />
                           <div className="d-flex justify-content-between align-items-center">
                             <strong>Final Total:</strong>
-                            <span className="h4 mb-0 text-success">₹{calculateFinalPrice()}</span>
+                            <span className="h4 mb-0 text-success">
+                              ₹{calculateFinalPrice()}
+                            </span>
                           </div>
                         </>
                       )}
@@ -1229,7 +1384,10 @@ const STLSlicer = () => {
                       id="stl-file-input"
                       disabled={isAddingFile || isCheckingOut}
                     />
-                    <label htmlFor="stl-file-input" className="file-input-custom">
+                    <label
+                      htmlFor="stl-file-input"
+                      className="file-input-custom"
+                    >
                       <i className="fas fa-cloud-upload-alt me-2"></i>
                       {file ? file.name : "Choose STL File"}
                     </label>
@@ -1257,19 +1415,25 @@ const STLSlicer = () => {
                     <Col md={4}>
                       <div className="dimension-stat">
                         <h6 className="mb-2 opacity-75">Max Height</h6>
-                        <h3 className="fw-bold mb-0">{MAX_DIMENSIONS.height} mm</h3>
+                        <h3 className="fw-bold mb-0">
+                          {MAX_DIMENSIONS.height} mm
+                        </h3>
                       </div>
                     </Col>
                     <Col md={4}>
                       <div className="dimension-stat">
                         <h6 className="mb-2 opacity-75">Max Width</h6>
-                        <h3 className="fw-bold mb-0">{MAX_DIMENSIONS.width} mm</h3>
+                        <h3 className="fw-bold mb-0">
+                          {MAX_DIMENSIONS.width} mm
+                        </h3>
                       </div>
                     </Col>
                     <Col md={4}>
                       <div className="dimension-stat">
                         <h6 className="mb-2 opacity-75">Max Depth</h6>
-                        <h3 className="fw-bold mb-0">{MAX_DIMENSIONS.depth} mm</h3>
+                        <h3 className="fw-bold mb-0">
+                          {MAX_DIMENSIONS.depth} mm
+                        </h3>
                       </div>
                     </Col>
                   </Row>
@@ -1282,48 +1446,90 @@ const STLSlicer = () => {
           {stlDimensions && (
             <Row className="mb-4">
               <Col>
-                <Card className={`professional-card ${!dimensionsValid ? 'dimension-invalid' : 'dimension-card'}`} style={{ backgroundColor: '#e3f2fd' }}>
+                <Card
+                  className={`professional-card ${!dimensionsValid ? "dimension-invalid" : "dimension-card"}`}
+                  style={{ backgroundColor: "#e3f2fd" }}
+                >
                   <Card.Body>
                     <h5 className="mb-4 fw-bold text-center">
                       <i className="fas fa-ruler-combined me-2"></i>
-                      Model vs Maximum Dimensions {!dimensionsValid && '⚠️ EXCEEDS LIMITS'}
+                      Model vs Maximum Dimensions{" "}
+                      {!dimensionsValid && "⚠️ EXCEEDS LIMITS"}
                     </h5>
                     <Row>
                       <Col md={4}>
-                        <div className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.height) > MAX_DIMENSIONS.height ? 'invalid' : ''}`}>
+                        <div
+                          className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.height) > MAX_DIMENSIONS.height ? "invalid" : ""}`}
+                        >
                           <h6 className="mb-2 opacity-75">Height</h6>
-                          <h3 className="fw-bold mb-1">{stlDimensions.height} mm</h3>
-                          <small className="text-muted">Max: {MAX_DIMENSIONS.height} mm</small>
-                          {parseFloat(stlDimensions.height) > MAX_DIMENSIONS.height && (
-                            <div><small className="text-warning fw-bold">Exceeds limit!</small></div>
+                          <h3 className="fw-bold mb-1">
+                            {stlDimensions.height} mm
+                          </h3>
+                          <small className="text-muted">
+                            Max: {MAX_DIMENSIONS.height} mm
+                          </small>
+                          {parseFloat(stlDimensions.height) >
+                            MAX_DIMENSIONS.height && (
+                            <div>
+                              <small className="text-warning fw-bold">
+                                Exceeds limit!
+                              </small>
+                            </div>
                           )}
                         </div>
                       </Col>
                       <Col md={4}>
-                        <div className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.width) > MAX_DIMENSIONS.width ? 'invalid' : ''}`}>
+                        <div
+                          className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.width) > MAX_DIMENSIONS.width ? "invalid" : ""}`}
+                        >
                           <h6 className="mb-2 opacity-75">Width</h6>
-                          <h3 className="fw-bold mb-1">{stlDimensions.width} mm</h3>
-                          <small className="text-muted">Max: {MAX_DIMENSIONS.width} mm</small>
-                          {parseFloat(stlDimensions.width) > MAX_DIMENSIONS.width && (
-                            <div><small className="text-warning fw-bold">Exceeds limit!</small></div>
+                          <h3 className="fw-bold mb-1">
+                            {stlDimensions.width} mm
+                          </h3>
+                          <small className="text-muted">
+                            Max: {MAX_DIMENSIONS.width} mm
+                          </small>
+                          {parseFloat(stlDimensions.width) >
+                            MAX_DIMENSIONS.width && (
+                            <div>
+                              <small className="text-warning fw-bold">
+                                Exceeds limit!
+                              </small>
+                            </div>
                           )}
                         </div>
                       </Col>
                       <Col md={4}>
-                        <div className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.depth) > MAX_DIMENSIONS.depth ? 'invalid' : ''}`}>
+                        <div
+                          className={`dimension-stat ${!dimensionsValid && parseFloat(stlDimensions.depth) > MAX_DIMENSIONS.depth ? "invalid" : ""}`}
+                        >
                           <h6 className="mb-2 opacity-75">Depth</h6>
-                          <h3 className="fw-bold mb-1">{stlDimensions.depth} mm</h3>
-                          <small className="text-muted">Max: {MAX_DIMENSIONS.depth} mm</small>
-                          {parseFloat(stlDimensions.depth) > MAX_DIMENSIONS.depth && (
-                            <div><small className="text-warning fw-bold">Exceeds limit!</small></div>
+                          <h3 className="fw-bold mb-1">
+                            {stlDimensions.depth} mm
+                          </h3>
+                          <small className="text-muted">
+                            Max: {MAX_DIMENSIONS.depth} mm
+                          </small>
+                          {parseFloat(stlDimensions.depth) >
+                            MAX_DIMENSIONS.depth && (
+                            <div>
+                              <small className="text-warning fw-bold">
+                                Exceeds limit!
+                              </small>
+                            </div>
                           )}
                         </div>
                       </Col>
                     </Row>
                     {!dimensionsValid && (
-                      <Alert variant="danger" className="alert-professional mt-4">
+                      <Alert
+                        variant="danger"
+                        className="alert-professional mt-4"
+                      >
                         <i className="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Model Too Large!</strong> Please resize your STL file or split it into smaller parts that fit within the maximum dimensions.
+                        <strong>Model Too Large!</strong> Please resize your STL
+                        file or split it into smaller parts that fit within the
+                        maximum dimensions.
                       </Alert>
                     )}
                   </Card.Body>
@@ -1342,11 +1548,22 @@ const STLSlicer = () => {
                     <h5 className="section-title">
                       <i className="fas fa-eye me-2"></i>3D Preview
                     </h5>
-                    <div className="viewer-container" style={{ height: '400px' }}>
+                    <div
+                      className="viewer-container"
+                      style={{ height: "400px" }}
+                    >
                       <Canvas shadows>
-                        <PerspectiveCamera makeDefault position={[300, 300, 300]} fov={40} />
+                        <PerspectiveCamera
+                          makeDefault
+                          position={[300, 300, 300]}
+                          fov={40}
+                        />
                         <ambientLight intensity={0.5} />
-                        <directionalLight position={[100, 200, 100]} intensity={1} castShadow />
+                        <directionalLight
+                          position={[100, 200, 100]}
+                          intensity={1}
+                          castShadow
+                        />
 
                         {/* Plate */}
                         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -1387,17 +1604,33 @@ const STLSlicer = () => {
                         className="fw-medium"
                         disabled={isAddingFile || isCheckingOut}
                       >
-                        <i className="fas fa-undo me-2"></i>Reset to Default Position
+                        <i className="fas fa-undo me-2"></i>Reset to Default
+                        Position
                       </Button>
                     </div>
 
                     {/* Move Controls */}
-                    <div className="mb-4" style={{ border: '2px solid #2a65c5', borderRadius: '8px', padding: '1rem' }}>
-                      <h6 className="fw-semibold mb-3 text-muted">Position Adjustment</h6>
+                    <div
+                      className="mb-4"
+                      style={{
+                        border: "2px solid #2a65c5",
+                        borderRadius: "8px",
+                        padding: "1rem",
+                      }}
+                    >
+                      <h6 className="fw-semibold mb-3 text-muted">
+                        Position Adjustment
+                      </h6>
                       <Row>
                         {["X", "Y", "Z"].map((axis, index) => (
                           <Col md={4} key={axis} className="mb-3">
-                            <div style={{ border: '1px solid #2a65c5', borderRadius: '6px', padding: '0.8rem' }}>
+                            <div
+                              style={{
+                                border: "1px solid #2a65c5",
+                                borderRadius: "6px",
+                                padding: "0.8rem",
+                              }}
+                            >
                               <Form.Label className="fw-medium text-dark">
                                 {axis}: {modelPosition[index].toFixed(1)}mm
                               </Form.Label>
@@ -1421,14 +1654,34 @@ const STLSlicer = () => {
                     </div>
 
                     {/* Rotate Controls */}
-                    <div className="mb-4" style={{ border: '2px solid #2a65c5', borderRadius: '8px', padding: '1rem' }}>
-                      <h6 className="fw-semibold mb-3 text-muted">Rotation Adjustment</h6>
+                    <div
+                      className="mb-4"
+                      style={{
+                        border: "2px solid #2a65c5",
+                        borderRadius: "8px",
+                        padding: "1rem",
+                      }}
+                    >
+                      <h6 className="fw-semibold mb-3 text-muted">
+                        Rotation Adjustment
+                      </h6>
                       <Row>
                         {["X", "Y", "Z"].map((axis, index) => (
                           <Col md={4} key={axis} className="mb-3">
-                            <div style={{ border: '1px solid #2a65c5', borderRadius: '6px', padding: '0.8rem' }}>
+                            <div
+                              style={{
+                                border: "1px solid #2a65c5",
+                                borderRadius: "6px",
+                                padding: "0.8rem",
+                              }}
+                            >
                               <Form.Label className="fw-medium text-dark">
-                                {axis}: {(modelRotation[index] * (180 / Math.PI)).toFixed(0)}°
+                                {axis}:{" "}
+                                {(
+                                  modelRotation[index] *
+                                  (180 / Math.PI)
+                                ).toFixed(0)}
+                                °
                               </Form.Label>
                               <Form.Range
                                 min={-180}
@@ -1437,7 +1690,9 @@ const STLSlicer = () => {
                                 value={modelRotation[index] * (180 / Math.PI)}
                                 onChange={(e) => {
                                   const newRot = [...modelRotation];
-                                  newRot[index] = (parseFloat(e.target.value) * Math.PI) / 180;
+                                  newRot[index] =
+                                    (parseFloat(e.target.value) * Math.PI) /
+                                    180;
                                   setModelRotation(newRot);
                                 }}
                                 className="control-slider"
@@ -1448,7 +1703,6 @@ const STLSlicer = () => {
                         ))}
                       </Row>
                     </div>
-
                   </Card.Body>
                 </Card>
               </Col>
@@ -1471,23 +1725,38 @@ const STLSlicer = () => {
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-layer-group me-2 text-primary"></i>Layer Height
+                              <i className="fas fa-layer-group me-2 text-primary"></i>
+                              Layer Height
                             </Form.Label>
                             <div className="position-relative">
                               <Form.Select
                                 value={userSettings.layerHeight}
-                                onChange={(e) => handleSettingChange('layerHeight', parseFloat(e.target.value))}
+                                onChange={(e) =>
+                                  handleSettingChange(
+                                    "layerHeight",
+                                    parseFloat(e.target.value),
+                                  )
+                                }
                                 className="professional-form-control"
-                                style={{ appearance: 'none', paddingRight: '2.5rem' }}
+                                style={{
+                                  appearance: "none",
+                                  paddingRight: "2.5rem",
+                                }}
                                 disabled={isAddingFile || isCheckingOut}
                               >
-                                {layerHeightOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
+                                {layerHeightOptions.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
                                     {option.label}
                                   </option>
                                 ))}
                               </Form.Select>
-                              <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
+                              <i
+                                className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                                style={{ pointerEvents: "none" }}
+                              ></i>
                             </div>
                           </Form.Group>
                         </Col>
@@ -1496,23 +1765,35 @@ const STLSlicer = () => {
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-fill-drip me-2 text-primary"></i>Infill Density
+                              <i className="fas fa-fill-drip me-2 text-primary"></i>
+                              Infill Density
                             </Form.Label>
                             <div className="position-relative">
                               <Form.Select
                                 value={userSettings.infillDensity}
-                                onChange={(e) => handleSettingChange('infillDensity', parseInt(e.target.value))}
+                                onChange={(e) =>
+                                  handleSettingChange(
+                                    "infillDensity",
+                                    parseInt(e.target.value),
+                                  )
+                                }
                                 className="professional-form-control"
-                                style={{ appearance: 'none', paddingRight: '2.5rem' }}
+                                style={{
+                                  appearance: "none",
+                                  paddingRight: "2.5rem",
+                                }}
                                 disabled={isAddingFile || isCheckingOut}
                               >
-                                {infillOptions.map(percentage => (
+                                {infillOptions.map((percentage) => (
                                   <option key={percentage} value={percentage}>
                                     {percentage}% Fill
                                   </option>
                                 ))}
                               </Form.Select>
-                              <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
+                              <i
+                                className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                                style={{ pointerEvents: "none" }}
+                              ></i>
                             </div>
                           </Form.Group>
                         </Col>
@@ -1521,25 +1802,41 @@ const STLSlicer = () => {
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-th me-2 text-primary"></i>Infill Pattern
+                              <i className="fas fa-th me-2 text-primary"></i>
+                              Infill Pattern
                             </Form.Label>
                             <div className="position-relative">
                               <Form.Select
                                 value={userSettings.infillPattern}
-                                onChange={(e) => handleSettingChange('infillPattern', e.target.value)}
+                                onChange={(e) =>
+                                  handleSettingChange(
+                                    "infillPattern",
+                                    e.target.value,
+                                  )
+                                }
                                 className="professional-form-control"
-                                style={{ appearance: 'none', paddingRight: '2.5rem' }}
+                                style={{
+                                  appearance: "none",
+                                  paddingRight: "2.5rem",
+                                }}
                                 disabled={isAddingFile || isCheckingOut}
                               >
                                 <option value="grid">Grid Pattern</option>
                                 <option value="lines">Linear Pattern</option>
-                                <option value="triangles">Triangle Pattern</option>
+                                <option value="triangles">
+                                  Triangle Pattern
+                                </option>
                                 <option value="cubic">Cubic Pattern</option>
-                                <option value="concentric">Concentric Pattern</option>
+                                <option value="concentric">
+                                  Concentric Pattern
+                                </option>
                                 <option value="zigzag">Zigzag Pattern</option>
                                 <option value="gyroid">Gyroid Pattern</option>
                               </Form.Select>
-                              <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
+                              <i
+                                className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                                style={{ pointerEvents: "none" }}
+                              ></i>
                             </div>
                           </Form.Group>
                         </Col>
@@ -1548,7 +1845,8 @@ const STLSlicer = () => {
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-hands-helping me-2 text-primary"></i>Support Structure
+                              <i className="fas fa-hands-helping me-2 text-primary"></i>
+                              Support Structure
                             </Form.Label>
                             <div className="d-flex gap-4 mt-2">
                               <Form.Check
@@ -1556,7 +1854,9 @@ const STLSlicer = () => {
                                 label="Not Required"
                                 name="support"
                                 checked={!userSettings.supportEnable}
-                                onChange={() => handleSettingChange('supportEnable', false)}
+                                onChange={() =>
+                                  handleSettingChange("supportEnable", false)
+                                }
                                 className="fw-medium"
                                 disabled={isAddingFile || isCheckingOut}
                               />
@@ -1565,7 +1865,9 @@ const STLSlicer = () => {
                                 label="Required"
                                 name="support"
                                 checked={userSettings.supportEnable}
-                                onChange={() => handleSettingChange('supportEnable', true)}
+                                onChange={() =>
+                                  handleSettingChange("supportEnable", true)
+                                }
                                 className="fw-medium"
                                 disabled={isAddingFile || isCheckingOut}
                               />
@@ -1577,40 +1879,95 @@ const STLSlicer = () => {
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-cube me-2 text-primary"></i>Material Type
+                              <i className="fas fa-cube me-2 text-primary"></i>
+                              Material Type
                             </Form.Label>
                             <div className="position-relative">
                               <Form.Select
                                 value={userSettings.materialType}
-                                onChange={(e) => handleSettingChange('materialType', e.target.value)}
+                                onChange={(e) =>
+                                  handleSettingChange(
+                                    "materialType",
+                                    e.target.value,
+                                  )
+                                }
                                 className="professional-form-control"
-                                style={{ appearance: 'none', paddingRight: '2.5rem' }}
+                                style={{
+                                  appearance: "none",
+                                  paddingRight: "2.5rem",
+                                }}
                                 disabled={isAddingFile || isCheckingOut}
                               >
-                                {materialOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
+                                {materialOptions.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
                                     {option.label} Filament
                                   </option>
                                 ))}
                               </Form.Select>
-                              <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
+                              <i
+                                className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                                style={{ pointerEvents: "none" }}
+                              ></i>
                             </div>
                           </Form.Group>
                         </Col>
 
-                        {/* Material Color */}
+                        {/* Material Color Dropdown */}
                         <Col lg={4} md={6} className="mb-4">
                           <Form.Group>
                             <Form.Label className="fw-semibold text-dark">
-                              <i className="fas fa-palette me-2 text-primary"></i>Material Color
+                              <i className="fas fa-palette me-2 text-primary"></i>
+                              Material Color
                             </Form.Label>
-                            <div className="d-flex align-items-center mt-2">
+                            <div className="position-relative">
+                              <Form.Select
+                                value={userSettings.materialColor}
+                                onChange={(e) =>
+                                  handleSettingChange(
+                                    "materialColor",
+                                    e.target.value,
+                                  )
+                                }
+                                className="professional-form-control"
+                                style={{
+                                  appearance: "none",
+                                  paddingRight: "2.5rem",
+                                }}
+                                disabled={isAddingFile || isCheckingOut}
+                              >
+                                <option value="white">White</option>
+                                <option value="black">Black</option>
+                                <option value="dark grey">Dark Grey</option>
+                                <option value="yellow">Yellow</option>
+                                <option value="blue">Blue</option>
+                                <option value="red">Red</option>
+                                <option value="green">Green</option>
+                              </Form.Select>
+                              <i
+                                className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                                style={{ pointerEvents: "none" }}
+                              ></i>
+                            </div>
+                            <div className="mt-2 d-flex align-items-center gap-2">
                               <div
-                                className="color-indicator"
-                                style={{ backgroundColor: userSettings.materialColor }}
+                                className="color-preview"
+                                style={{
+                                  width: "24px",
+                                  height: "24px",
+                                  borderRadius: "50%",
+                                  backgroundColor:
+                                    userSettings.materialColor === "dark grey"
+                                      ? "#555555"
+                                      : userSettings.materialColor,
+                                  border: "2px solid #ddd",
+                                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                                }}
                               ></div>
                               <span className="fw-medium text-capitalize">
-                                {userSettings.materialColor} Color
+                                {userSettings.materialColor} Color Selected
                               </span>
                             </div>
                           </Form.Group>
@@ -1618,27 +1975,46 @@ const STLSlicer = () => {
                       </Row>
 
                       {/* Quantity and Special Notes Section - Now moved before slicing */}
-                      <div className="mt-4 pt-4" style={{ borderTop: '2px solid rgba(42, 101, 197, 0.1)' }}>
+                      <div
+                        className="mt-4 pt-4"
+                        style={{
+                          borderTop: "2px solid rgba(42, 101, 197, 0.1)",
+                        }}
+                      >
                         <h6 className="fw-bold mb-3 text-primary">
-                          <i className="fas fa-plus-circle me-2"></i>Order Configuration
+                          <i className="fas fa-plus-circle me-2"></i>Order
+                          Configuration
                         </h6>
                         <Row>
                           {/* Quantity */}
                           <Col md={6} className="mb-3">
                             <Form.Group>
                               <Form.Label className="fw-semibold text-dark">
-                                <i className="fas fa-sort-numeric-up me-2 text-primary"></i>Quantity
+                                <i className="fas fa-sort-numeric-up me-2 text-primary"></i>
+                                Quantity
                               </Form.Label>
                               <div className="d-flex align-items-center gap-3 mt-2">
                                 <Button
                                   variant="outline-secondary"
                                   className="quantity-control"
-                                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                  disabled={quantity <= 1 || isAddingFile || isCheckingOut}
+                                  onClick={() =>
+                                    setQuantity(Math.max(1, quantity - 1))
+                                  }
+                                  disabled={
+                                    quantity <= 1 ||
+                                    isAddingFile ||
+                                    isCheckingOut
+                                  }
                                 >
                                   -
                                 </Button>
-                                <span className="fw-bold fs-4 text-primary" style={{ minWidth: '3rem', textAlign: 'center' }}>
+                                <span
+                                  className="fw-bold fs-4 text-primary"
+                                  style={{
+                                    minWidth: "3rem",
+                                    textAlign: "center",
+                                  }}
+                                >
                                   {quantity}
                                 </span>
                                 <Button
@@ -1660,13 +2036,16 @@ const STLSlicer = () => {
                           <Col md={6} className="mb-3">
                             <Form.Group>
                               <Form.Label className="fw-semibold text-dark">
-                                <i className="fas fa-sticky-note me-2 text-primary"></i>Special Instructions
+                                <i className="fas fa-sticky-note me-2 text-primary"></i>
+                                Special Instructions
                               </Form.Label>
                               <Form.Control
                                 as="textarea"
                                 rows={3}
                                 value={specialNotes}
-                                onChange={(e) => setSpecialNotes(e.target.value)}
+                                onChange={(e) =>
+                                  setSpecialNotes(e.target.value)
+                                }
                                 placeholder="Any special requirements or instructions..."
                                 className="professional-form-control"
                                 maxLength={500}
@@ -1693,10 +2072,16 @@ const STLSlicer = () => {
                 {/* Slice Button */}
                 <Button
                   onClick={sliceFile}
-                  disabled={!file || isSlicing || !dimensionsValid || isAddingFile || isCheckingOut}
-                  className={`py-3 fw-bold ${!file || isSlicing || !dimensionsValid ? '' : 'professional-button'}`}
+                  disabled={
+                    !file ||
+                    isSlicing ||
+                    !dimensionsValid ||
+                    isAddingFile ||
+                    isCheckingOut
+                  }
+                  className={`py-3 fw-bold ${!file || isSlicing || !dimensionsValid ? "" : "professional-button"}`}
                   size="lg"
-                  style={{ fontSize: '1.1rem', letterSpacing: '0.5px' }}
+                  style={{ fontSize: "1.1rem", letterSpacing: "0.5px" }}
                 >
                   {isSlicing ? (
                     <>
@@ -1706,7 +2091,9 @@ const STLSlicer = () => {
                   ) : (
                     <>
                       <i className="fas fa-magic me-2"></i>
-                      {!dimensionsValid ? 'Cannot Process - Model Too Large' : 'Analyze & Generate Quote'}
+                      {!dimensionsValid
+                        ? "Cannot Process - Model Too Large"
+                        : "Analyze & Generate Quote"}
                     </>
                   )}
                 </Button>
@@ -1718,12 +2105,16 @@ const STLSlicer = () => {
                     variant="outline-success"
                     className="py-3 fw-bold"
                     size="lg"
-                    style={{ fontSize: '1.1rem', letterSpacing: '0.5px' }}
+                    style={{ fontSize: "1.1rem", letterSpacing: "0.5px" }}
                     disabled={isAddingFile || isCheckingOut}
                   >
                     {isAddingFile ? (
                       <>
-                        <Spinner animation="border" size="sm" className="me-2" />
+                        <Spinner
+                          animation="border"
+                          size="sm"
+                          className="me-2"
+                        />
                         Saving File Data...
                       </>
                     ) : (
@@ -1738,7 +2129,8 @@ const STLSlicer = () => {
               {!dimensionsValid && (
                 <p className="text-center text-danger mt-3 fw-medium">
                   <i className="fas fa-info-circle me-2"></i>
-                  Please upload an STL file within the maximum dimensions to continue.
+                  Please upload an STL file within the maximum dimensions to
+                  continue.
                 </p>
               )}
             </Col>
@@ -1770,8 +2162,15 @@ const STLSlicer = () => {
           {error && (
             <Row className="mb-4">
               <Col>
-                <Alert variant={error.includes('saved successfully') ? "success" : "danger"} className="alert-professional">
-                  <i className={`fas ${error.includes('saved successfully') ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
+                <Alert
+                  variant={
+                    error.includes("saved successfully") ? "success" : "danger"
+                  }
+                  className="alert-professional"
+                >
+                  <i
+                    className={`fas ${error.includes("saved successfully") ? "fa-check-circle" : "fa-exclamation-circle"} me-2`}
+                  ></i>
                   {error}
                 </Alert>
               </Col>
@@ -1792,9 +2191,18 @@ const STLSlicer = () => {
                     <Row className="justify-content-center">
                       <Col lg={10}>
                         {/* Available Coupons Section */}
-                        <Card className="border-0 shadow-sm mb-4" style={{ background: 'linear-gradient(135deg, rgba(147, 197, 253, 0.15) 0%, rgba(196, 181, 253, 0.15) 100%)' }}>
+                        <Card
+                          className="border-0 shadow-sm mb-4"
+                          style={{
+                            background:
+                              "linear-gradient(135deg, rgba(147, 197, 253, 0.15) 0%, rgba(196, 181, 253, 0.15) 100%)",
+                          }}
+                        >
                           <Card.Body>
-                            <h5 className="fw-bold mb-3" style={{ color: '#4338ca' }}>
+                            <h5
+                              className="fw-bold mb-3"
+                              style={{ color: "#4338ca" }}
+                            >
                               <i className="fas fa-tags me-2"></i>
                               Available Coupons & Discounts
                             </h5>
@@ -1807,43 +2215,71 @@ const STLSlicer = () => {
                             ) : availableCoupons.length > 0 ? (
                               <Row className="mb-4">
                                 {availableCoupons.map((coupon, index) => (
-                                  <Col md={6} lg={4} key={coupon.id} className="mb-3">
-                                    <Card className="h-100" style={{
-                                      border: '2px solid #6366f1',
-                                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-                                      boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.1)'
-                                    }}>
+                                  <Col
+                                    md={6}
+                                    lg={4}
+                                    key={coupon.id}
+                                    className="mb-3"
+                                  >
+                                    <Card
+                                      className="h-100"
+                                      style={{
+                                        border: "2px solid #6366f1",
+                                        background:
+                                          "linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)",
+                                        boxShadow:
+                                          "0 4px 6px -1px rgba(99, 102, 241, 0.1)",
+                                      }}
+                                    >
                                       <Card.Body className="text-center">
                                         <div className="mb-2">
-                                          <Badge style={{
-                                            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                            border: 'none'
-                                          }} className="fs-6 px-3 py-2">
+                                          <Badge
+                                            style={{
+                                              background:
+                                                "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                                              border: "none",
+                                            }}
+                                            className="fs-6 px-3 py-2"
+                                          >
                                             {coupon.discount}% OFF
                                           </Badge>
                                         </div>
-                                        <h6 className="fw-bold mb-2" style={{ color: '#4338ca' }}>{coupon.name}</h6>
+                                        <h6
+                                          className="fw-bold mb-2"
+                                          style={{ color: "#4338ca" }}
+                                        >
+                                          {coupon.name}
+                                        </h6>
                                         <small className="text-muted d-block mb-2">
-                                          Expires: {new Date(coupon.expiry).toLocaleDateString()}
+                                          Expires:{" "}
+                                          {new Date(
+                                            coupon.expiry,
+                                          ).toLocaleDateString()}
                                         </small>
                                         <Button
                                           style={{
-                                            background: 'transparent',
-                                            border: '2px solid #6366f1',
-                                            color: '#4338ca'
+                                            background: "transparent",
+                                            border: "2px solid #6366f1",
+                                            color: "#4338ca",
                                           }}
                                           size="sm"
-                                          onClick={() => copyCouponCode(coupon.name)}
+                                          onClick={() =>
+                                            copyCouponCode(coupon.name)
+                                          }
                                           className="fw-medium"
                                           onMouseOver={(e) => {
-                                            e.target.style.background = 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
-                                            e.target.style.color = 'white';
+                                            e.target.style.background =
+                                              "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)";
+                                            e.target.style.color = "white";
                                           }}
                                           onMouseOut={(e) => {
-                                            e.target.style.background = 'transparent';
-                                            e.target.style.color = '#4338ca';
+                                            e.target.style.background =
+                                              "transparent";
+                                            e.target.style.color = "#4338ca";
                                           }}
-                                          disabled={isAddingFile || isCheckingOut}
+                                          disabled={
+                                            isAddingFile || isCheckingOut
+                                          }
                                         >
                                           <i className="fas fa-copy me-1"></i>
                                           Copy Code
@@ -1861,8 +2297,16 @@ const STLSlicer = () => {
                             )}
 
                             {/* Coupon Application Section */}
-                            <div className="mt-4 pt-3" style={{ borderTop: '2px solid #6366f1' }}>
-                              <h6 className="fw-bold mb-3" style={{ color: '#4338ca' }}>Apply Coupon Code</h6>
+                            <div
+                              className="mt-4 pt-3"
+                              style={{ borderTop: "2px solid #6366f1" }}
+                            >
+                              <h6
+                                className="fw-bold mb-3"
+                                style={{ color: "#4338ca" }}
+                              >
+                                Apply Coupon Code
+                              </h6>
                               <Row className="align-items-end">
                                 <Col md={8}>
                                   <Form.Group>
@@ -1870,9 +2314,17 @@ const STLSlicer = () => {
                                       type="text"
                                       placeholder="Enter coupon code here..."
                                       value={couponInput}
-                                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                      onChange={(e) =>
+                                        setCouponInput(
+                                          e.target.value.toUpperCase(),
+                                        )
+                                      }
                                       className="professional-form-control"
-                                      disabled={appliedCoupon !== null || isAddingFile || isCheckingOut}
+                                      disabled={
+                                        appliedCoupon !== null ||
+                                        isAddingFile ||
+                                        isCheckingOut
+                                      }
                                     />
                                   </Form.Group>
                                 </Col>
@@ -1890,13 +2342,18 @@ const STLSlicer = () => {
                                   ) : (
                                     <Button
                                       style={{
-                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                        border: 'none',
-                                        color: 'white'
+                                        background:
+                                          "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                        border: "none",
+                                        color: "white",
                                       }}
                                       onClick={applyCoupon}
                                       className="w-100 fw-medium"
-                                      disabled={!couponInput.trim() || isAddingFile || isCheckingOut}
+                                      disabled={
+                                        !couponInput.trim() ||
+                                        isAddingFile ||
+                                        isCheckingOut
+                                      }
                                     >
                                       <i className="fas fa-check me-2"></i>
                                       Apply
@@ -1914,20 +2371,29 @@ const STLSlicer = () => {
                               )}
 
                               {appliedCoupon && (
-                                <Alert style={{
-                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                                  border: '2px solid #10b981',
-                                  color: '#047857'
-                                }} className="mt-3 mb-0">
+                                <Alert
+                                  style={{
+                                    background:
+                                      "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)",
+                                    border: "2px solid #10b981",
+                                    color: "#047857",
+                                  }}
+                                  className="mt-3 mb-0"
+                                >
                                   <div className="d-flex justify-content-between align-items-center">
                                     <span>
                                       <i className="fas fa-check-circle me-2"></i>
-                                      <strong>{appliedCoupon.name}</strong> applied successfully!
+                                      <strong>{appliedCoupon.name}</strong>{" "}
+                                      applied successfully!
                                     </span>
-                                    <Badge style={{
-                                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                      border: 'none'
-                                    }} className="fs-6">
+                                    <Badge
+                                      style={{
+                                        background:
+                                          "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                        border: "none",
+                                      }}
+                                      className="fs-6"
+                                    >
                                       {appliedCoupon.discount}% OFF
                                     </Badge>
                                   </div>
@@ -1938,7 +2404,10 @@ const STLSlicer = () => {
                         </Card>
 
                         {/* Detailed Price Breakdown */}
-                        <Card className="border-0 shadow-sm mb-4" style={{ background: 'rgba(255,255,255,0.95)' }}>
+                        <Card
+                          className="border-0 shadow-sm mb-4"
+                          style={{ background: "rgba(255,255,255,0.95)" }}
+                        >
                           <Card.Body>
                             <h5 className="fw-bold mb-4 text-center">
                               <i className="fas fa-calculator me-2"></i>
@@ -1954,57 +2423,86 @@ const STLSlicer = () => {
                               <Row>
                                 <Col md={6}>
                                   <div className="mb-2">
-                                    <strong>Unit Price:</strong> ₹{printInfo.pricing.finalPrice}
+                                    <strong>Unit Price:</strong> ₹
+                                    {printInfo.pricing.finalPrice}
                                   </div>
                                   <div className="mb-2">
                                     <strong>Quantity:</strong> {quantity}
                                   </div>
                                   <div className="mb-2">
-                                    <strong>Material:</strong> {userSettings.materialType.toUpperCase()}
+                                    <strong>Material:</strong>{" "}
+                                    {userSettings.materialType.toUpperCase()}
                                   </div>
                                 </Col>
                                 <Col md={6}>
                                   <div className="mb-2">
-                                    <strong>Layer Height:</strong> {userSettings.layerHeight}mm
+                                    <strong>Layer Height:</strong>{" "}
+                                    {userSettings.layerHeight}mm
                                   </div>
                                   <div className="mb-2">
-                                    <strong>Infill:</strong> {userSettings.infillDensity}%
+                                    <strong>Infill:</strong>{" "}
+                                    {userSettings.infillDensity}%
                                   </div>
                                   <div className="mb-2">
-                                    <strong>Support:</strong> {userSettings.supportEnable ? 'Yes' : 'No'}
+                                    <strong>Support:</strong>{" "}
+                                    {userSettings.supportEnable ? "Yes" : "No"}
                                   </div>
                                 </Col>
                               </Row>
                               <div className="mt-3 pt-3 border-top">
                                 <div className="d-flex justify-content-between align-items-center">
-                                  <span className="fw-bold">Subtotal for this file:</span>
-                                  <span className="h6 mb-0 text-primary">₹{printInfo.pricing.finalPrice * quantity}</span>
+                                  <span className="fw-bold">
+                                    Subtotal for this file:
+                                  </span>
+                                  <span className="h6 mb-0 text-primary">
+                                    ₹{printInfo.pricing.finalPrice * quantity}
+                                  </span>
                                 </div>
                               </div>
                             </div>
 
                             {/* All Files Summary */}
                             {stlFiles.length > 0 && (
-                              <div className="mb-4 p-3" style={{ background: '#e3f2fd', borderRadius: '8px' }}>
+                              <div
+                                className="mb-4 p-3"
+                                style={{
+                                  background: "#e3f2fd",
+                                  borderRadius: "8px",
+                                }}
+                              >
                                 <h6 className="fw-bold mb-3">
                                   <i className="fas fa-folder me-2 text-primary"></i>
                                   Previously Added Files ({stlFiles.length})
                                 </h6>
                                 {stlFiles.map((fileData, index) => (
-                                  <div key={index} className="d-flex justify-content-between align-items-center mb-2">
+                                  <div
+                                    key={index}
+                                    className="d-flex justify-content-between align-items-center mb-2"
+                                  >
                                     <span className="text-truncate me-2">
                                       {fileData.name} (Qty: {fileData.quantity})
                                     </span>
                                     <span className="fw-bold text-nowrap">
-                                      ₹{(fileData.pricing?.finalPrice || 0) * fileData.quantity}
+                                      ₹
+                                      {(fileData.pricing?.finalPrice || 0) *
+                                        fileData.quantity}
                                     </span>
                                   </div>
                                 ))}
                                 <div className="mt-3 pt-3 border-top">
                                   <div className="d-flex justify-content-between align-items-center">
-                                    <span className="fw-bold">Subtotal for saved files:</span>
+                                    <span className="fw-bold">
+                                      Subtotal for saved files:
+                                    </span>
                                     <span className="h6 mb-0 text-primary">
-                                      ₹{stlFiles.reduce((total, file) => total + ((file.pricing?.finalPrice || 0) * file.quantity), 0)}
+                                      ₹
+                                      {stlFiles.reduce(
+                                        (total, file) =>
+                                          total +
+                                          (file.pricing?.finalPrice || 0) *
+                                            file.quantity,
+                                        0,
+                                      )}
                                     </span>
                                   </div>
                                 </div>
@@ -2012,30 +2510,50 @@ const STLSlicer = () => {
                             )}
 
                             {/* Grand Total Calculation */}
-                            <div className="p-4" style={{ background: 'linear-gradient(135deg, rgba(42, 101, 197, 0.1) 0%, rgba(42, 101, 197, 0.05) 100%)', borderRadius: '12px', border: '2px solid rgba(42, 101, 197, 0.2)' }}>
-                              <h6 className="fw-bold mb-3 text-center">Final Order Calculation</h6>
-                              
+                            <div
+                              className="p-4"
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, rgba(42, 101, 197, 0.1) 0%, rgba(42, 101, 197, 0.05) 100%)",
+                                borderRadius: "12px",
+                                border: "2px solid rgba(42, 101, 197, 0.2)",
+                              }}
+                            >
+                              <h6 className="fw-bold mb-3 text-center">
+                                Final Order Calculation
+                              </h6>
+
                               <div className="d-flex justify-content-between align-items-center mb-2">
                                 <span className="fw-medium">
-                                  Order Subtotal ({stlFiles.length + 1} file{stlFiles.length > 0 ? 's' : ''}):
+                                  Order Subtotal ({stlFiles.length + 1} file
+                                  {stlFiles.length > 0 ? "s" : ""}):
                                 </span>
-                                <span className="fw-bold">₹{calculateSubtotal()}</span>
+                                <span className="fw-bold">
+                                  ₹{calculateSubtotal()}
+                                </span>
                               </div>
 
                               {appliedCoupon && (
-                                <div className="d-flex justify-content-between align-items-center mb-2" style={{ color: '#047857' }}>
+                                <div
+                                  className="d-flex justify-content-between align-items-center mb-2"
+                                  style={{ color: "#047857" }}
+                                >
                                   <span className="fw-medium">
                                     <i className="fas fa-tag me-1"></i>
                                     Coupon Discount ({appliedCoupon.discount}%):
                                   </span>
-                                  <span className="fw-bold">-₹{getDiscountAmount()}</span>
+                                  <span className="fw-bold">
+                                    -₹{getDiscountAmount()}
+                                  </span>
                                 </div>
                               )}
 
                               <hr className="my-3" />
 
                               <div className="d-flex justify-content-between align-items-center mb-4">
-                                <span className="h5 fw-bold">Grand Total (Excluding Delivery):</span>
+                                <span className="h5 fw-bold">
+                                  Grand Total (Excluding Delivery):
+                                </span>
                                 <div className="text-end">
                                   {appliedCoupon && (
                                     <div className="text-muted text-decoration-line-through mb-1">
@@ -2050,17 +2568,24 @@ const STLSlicer = () => {
 
                               {/* Savings Display */}
                               {appliedCoupon && (
-                                <Alert style={{
-                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%)',
-                                  border: '2px solid #10b981',
-                                  color: '#047857'
-                                }} className="mb-4">
+                                <Alert
+                                  style={{
+                                    background:
+                                      "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%)",
+                                    border: "2px solid #10b981",
+                                    color: "#047857",
+                                  }}
+                                  className="mb-4"
+                                >
                                   <div className="text-center">
                                     <h6 className="mb-2">
                                       <i className="fas fa-money-bill-wave me-2"></i>
                                       You're Saving ₹{getDiscountAmount()}!
                                     </h6>
-                                    <p className="mb-0">Thanks for using coupon: <strong>{appliedCoupon.name}</strong></p>
+                                    <p className="mb-0">
+                                      Thanks for using coupon:{" "}
+                                      <strong>{appliedCoupon.name}</strong>
+                                    </p>
                                   </div>
                                 </Alert>
                               )}
@@ -2068,11 +2593,17 @@ const STLSlicer = () => {
 
                             {/* Special Notes Display */}
                             {specialNotes.trim() && (
-                              <Alert variant="warning" className="alert-professional mt-4">
+                              <Alert
+                                variant="warning"
+                                className="alert-professional mt-4"
+                              >
                                 <p className="fw-bold mb-2">
-                                  <i className="fas fa-sticky-note me-2"></i>Special Instructions:
+                                  <i className="fas fa-sticky-note me-2"></i>
+                                  Special Instructions:
                                 </p>
-                                <p className="mb-0 fst-italic">"{specialNotes}"</p>
+                                <p className="mb-0 fst-italic">
+                                  "{specialNotes}"
+                                </p>
                               </Alert>
                             )}
 
@@ -2086,13 +2617,19 @@ const STLSlicer = () => {
                               >
                                 {isCheckingOut ? (
                                   <>
-                                    <Spinner animation="border" size="sm" className="me-2" />
+                                    <Spinner
+                                      animation="border"
+                                      size="sm"
+                                      className="me-2"
+                                    />
                                     Preparing Checkout...
                                   </>
                                 ) : (
                                   <>
                                     <i className="fas fa-shopping-cart me-2"></i>
-                                    Checkout All {stlFiles.length + 1} File{stlFiles.length > 0 ? 's' : ''} - ₹{calculateFinalPrice()}
+                                    Checkout All {stlFiles.length + 1} File
+                                    {stlFiles.length > 0 ? "s" : ""} - ₹
+                                    {calculateFinalPrice()}
                                   </>
                                 )}
                               </Button>
@@ -2105,7 +2642,11 @@ const STLSlicer = () => {
                               >
                                 {isAddingFile ? (
                                   <>
-                                    <Spinner animation="border" size="sm" className="me-2" />
+                                    <Spinner
+                                      animation="border"
+                                      size="sm"
+                                      className="me-2"
+                                    />
                                     Saving File...
                                   </>
                                 ) : (
@@ -2133,7 +2674,7 @@ const STLSlicer = () => {
             </Row>
           )}
         </Container>
-        <Footer/>
+        <Footer />
       </div>
     </>
   );

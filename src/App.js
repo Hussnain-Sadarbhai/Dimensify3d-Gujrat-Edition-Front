@@ -43,9 +43,10 @@ import OnlineStoreLogin from "./components/OnlineStoreLogin";
 import Promotion from "./components/Promotion_page";
 import Form from "./components/Forms";
 import AdminPageViewCount from "./components/AdminPromotionvisit";
-import LandingPage from "./components/LandingPage";
+// import LandingPage from "./components/LandingPage";
 import AdminLandingPage from "./components/AdminLandingPage";
 import MyHelpReq from "./components/MyHelpReq";
+import Header2 from "./components/Header2";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -66,6 +67,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<STLSlicer />} />
+            <Route path="/header2" element={<Header2/>} />
             <Route path="/help" element={<HelpSection />} />
             <Route path="/adminlogin" element={<AdminLogin />} />
             <Route path="/checkout" element={<Checkout />} />
@@ -92,7 +94,7 @@ function App() {
             />
             <Route path="/account" element={<Account />} />
             <Route path="/itemdetails" element={<ItemDetails />} />
-            <Route path="/landing-page" element={<LandingPage/>} />
+            {/* <Route path="/landing-page" element={<LandingPage/>} /> */}
             <Route path="/myhelprequest" element={<MyHelpReq/>} />
 
             {/* Protected Admin Routes */}

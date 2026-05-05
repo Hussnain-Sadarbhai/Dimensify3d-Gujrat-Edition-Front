@@ -4,6 +4,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import API_BASE_URL from "./apiConfig";
 import { useNavigate, useLocation } from "react-router-dom";
+import Header2 from "./Header2"; // Import the Header2 component
 
 export default function ProductStore() {
   const [products, setProducts] = useState([]);
@@ -17,12 +18,13 @@ export default function ProductStore() {
   const [showLoginPopup, setShowLoginPopup] = useState(false);
   const [addingToCart, setAddingToCart] = useState({});
 
- const location= useLocation();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  
-
-  
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -228,14 +230,15 @@ export default function ProductStore() {
     window.location.href = "/cart";
   };
   
-    useEffect(() => {
-      // Push current path to history stack
-      // Then immediately replace previous history entry with root for back button to land at "/"
-      if (location.pathname !== '/') {
-        window.history.pushState(null, '', location.pathname);
-        window.history.replaceState(null, '', '/');
-      }
-    }, [location.pathname]);
+  useEffect(() => {
+    // Push current path to history stack
+    // Then immediately replace previous history entry with root for back button to land at "/"
+    if (location.pathname !== '/') {
+      window.history.pushState(null, '', location.pathname);
+      window.history.replaceState(null, '', '/');
+    }
+  }, [location.pathname]);
+  
   return (
     <>
       <style>{`
@@ -256,50 +259,24 @@ export default function ProductStore() {
             sans-serif;
         }
 
-
-        .online-header {
-          background: linear-gradient(
-            180deg,
-            rgba(14, 58, 129, 1) 0%,
-            rgba(51, 118, 213, 1) 100%
-          );
-          padding: 2rem 0;
-          box-shadow: 0 10px 40px rgba(42, 101, 197, 0.4);
-          margin-bottom: 3rem;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .online-header-title {
-          color: white;
-          font-size: 2.5rem;
-          font-weight: 400;
-          text-align: center;
-          margin: 0;
-          letter-spacing: 2px;
-          text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
-          position: relative;
-          z-index: 2;
-          font-family: 'Poppins', sans-serif;
-        }
-
-        .online-header-subtitle {
-          color: rgba(255, 255, 255, 0.95);
-          text-align: center;
-          font-size: 1.1rem;
-          margin-top: 0.5rem;
-          font-weight: 400;
-          letter-spacing: 1px;
-          position: relative;
-          z-index: 2;
-        }
-
+        /* Remove custom header styles since we're using Header2 */
+        /* Keep all other styles except header-related ones */
+        
         .online-search-section {
           background: white;
           padding: 2rem;
           border-radius: 16px;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
           margin-bottom: 2.5rem;
+          margin-top: 2rem;
+        }
+
+        /* Add extra padding for mobile to prevent header overlap */
+        @media (max-width: 768px) {
+          .online-search-section {
+            margin-top: 1rem;
+            padding: 1rem;
+          }
         }
 
         .online-search-input-group {
@@ -753,59 +730,10 @@ export default function ProductStore() {
           transform: translateY(-2px);
         }
 
-        .online-header-nav-btn {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          background: rgba(255, 255, 255, 0.2);
-          backdrop-filter: blur(10px);
-          border: 2px solid rgba(255, 255, 255, 0.4);
-          color: white;
-          padding: 0.75rem 1.25rem;
-          border-radius: 12px;
-          font-weight: 600;
-          font-size: 0.95rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          z-index: 10;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .online-header-nav-btn:hover {
-          background: rgba(255, 255, 255, 0.95);
-          border-color: white;
-          color: rgb(42, 101, 197);
-          transform: translateY(-50%) scale(1.05);
-        }
-
-        .online-header-back-btn {
-          left: 2rem;
-        }
-
-        .online-header-cart-btn {
-          right: 2rem;
-        }
-
-        .online-header-cart-btn .cart-icon-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
         @media (max-width: 768px) {
-          .online-header-title {
-            font-size: 2rem;
-          }
-
-          .online-header-subtitle {
-            font-size: 1rem;
-          }
-
           .online-search-section {
             padding: 1.5rem;
+            margin-top: 1rem;
           }
 
           .online-final-price {
@@ -827,24 +755,13 @@ export default function ProductStore() {
           .online-popup-buttons {
             flex-direction: column;
           }
+        }
 
-          .online-header-nav-btn {
-            padding: 0.6rem 1rem;
-            font-size: 0.85rem;
-          }
-
-          .online-header-back-btn {
-            left: 1rem;
-            top: 12rem;
-          }
-
-          .online-header-cart-btn {
-            right: 1rem;
-            top: 12rem;
-          }
-
-          .online-header-nav-btn span {
-            display: none;
+        /* Additional margin for very small screens */
+        @media (max-width: 480px) {
+          .online-search-section {
+            margin-top: 0.5rem;
+            padding: 1rem;
           }
         }
       `}</style>
@@ -863,178 +780,165 @@ export default function ProductStore() {
           theme="light"
         />
 
-        <div className="online-header">
-          <button className="online-header-nav-btn online-header-back-btn" onClick={handleBackClick}>
-            <ArrowLeft size={20} />
-            <span>Back</span>
-          </button>
+        {/* Header2 Component - Replaces custom header */}
+        <Header2 />
 
-          <button className="online-header-nav-btn online-header-cart-btn" onClick={handleCartClick}>
-            <div className="cart-icon-wrapper">
-              <ShoppingCart size={20} />
-            </div>
-            <span>Cart</span>
-          </button>
-
+        {/* Add a wrapper div with margin top to push content below header */}
+        <div style={{ marginTop: "150px" }}>
           <div className="container">
-            <h1 className="online-header-title">DIMENSIFY3D ONLINE STORE</h1>
-            <p className="online-header-subtitle">✨ Explore, Customize & Create — All in One Place ✨</p>
-          </div>
-        </div>
-
-        <div className="container">
-          <div className="online-search-section">
-            <div className="row g-3">
-              <div className="col-12 col-md-8">
-                <div className="online-search-input-group">
-                  <div className="online-search-icon">
-                    <Search size={20} color="#7f8c8d" />
+            <div className="online-search-section">
+              <div className="row g-3">
+                <div className="col-12 col-md-8">
+                  <div className="online-search-input-group">
+                    <div className="online-search-icon">
+                      <Search size={20} color="#7f8c8d" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search by model name or description..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="online-search-input"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Search by model name or description..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="online-search-input"
-                  />
                 </div>
-              </div>
-              <div className="col-12 col-md-4">
-                <div className="online-category-select-wrapper">
-                  <label className="online-category-label">CATEGORIES</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="online-category-select"
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                <div className="col-12 col-md-4">
+                  <div className="online-category-select-wrapper">
+                    <label className="online-category-label">CATEGORIES</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="online-category-select"
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {loading && (
-            <div style={{ textAlign: 'center', padding: '4rem 0' }}>
-              <div className="online-spinner"></div>
-              <p style={{ marginTop: '1rem', color: '#7f8c8d' }}>Loading products...</p>
-            </div>
-          )}
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '4rem 0' }}>
+                <div className="online-spinner"></div>
+                <p style={{ marginTop: '1rem', color: '#7f8c8d' }}>Loading products...</p>
+              </div>
+            )}
 
-          {error && (
-            <div className="online-alert-custom">
-              <strong>Error:</strong> {error}
-            </div>
-          )}
+            {error && (
+              <div className="online-alert-custom">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
 
-          {!loading && !error && filteredProducts.length === 0 && (
-            <div className="online-no-products">
-              <Package size={80} className="online-no-products-icon" />
-              <h3>No Products Found</h3>
-              <p>Try adjusting your search or filter criteria</p>
-            </div>
-          )}
+            {!loading && !error && filteredProducts.length === 0 && (
+              <div className="online-no-products">
+                <Package size={80} className="online-no-products-icon" />
+                <h3>No Products Found</h3>
+                <p>Try adjusting your search or filter criteria</p>
+              </div>
+            )}
 
-          {!loading && !error && filteredProducts.length > 0 && (
-            <div className="row g-4 pb-5">
-              {filteredProducts.map(product => {
-                const currentIndex = currentImageIndex[product.id] || 0;
-                const hasMultipleImages = product.images && product.images.length > 1;
-                const showPriceAtCheckout = !product.finalPrice || product.finalPrice === 0;
-                const isAddingToCart = addingToCart[product.id] || false;
-                
-                return (
-                  <div key={product.id} className="col-12 col-sm-6 col-lg-4">
-                    <div className="online-product-card" onClick={() => handleProductClick(product)}>
-                      <div className="online-image-container">
-                        <div className="online-product-image">
-                          <img src={product.images[currentIndex]} alt={product.modelName} />
+            {!loading && !error && filteredProducts.length > 0 && (
+              <div className="row g-4 pb-5">
+                {filteredProducts.map(product => {
+                  const currentIndex = currentImageIndex[product.id] || 0;
+                  const hasMultipleImages = product.images && product.images.length > 1;
+                  const showPriceAtCheckout = !product.finalPrice || product.finalPrice === 0;
+                  const isAddingToCart = addingToCart[product.id] || false;
+                  
+                  return (
+                    <div key={product.id} className="col-12 col-sm-6 col-lg-4">
+                      <div className="online-product-card" onClick={() => handleProductClick(product)}>
+                        <div className="online-image-container">
+                          <div className="online-product-image">
+                            <img src={product.images[currentIndex]} alt={product.modelName} />
+                          </div>
+                          
+                          {product.off > 0 && !showPriceAtCheckout && (
+                            <div className="online-discount-badge">{product.off}% OFF</div>
+                          )}
+
+                          {hasMultipleImages && (
+                            <>
+                              <button className="online-image-nav-btn online-prev"
+                                onClick={(e) => handlePrevImage(product.id, product.images.length, e)}>
+                                <ChevronLeft size={20} color="#333" />
+                              </button>
+                              <button className="online-image-nav-btn online-next"
+                                onClick={(e) => handleNextImage(product.id, product.images.length, e)}>
+                                <ChevronRight size={20} color="#333" />
+                              </button>
+                              <div className="online-image-indicators">
+                                {product.images.map((_, idx) => (
+                                  <div key={idx}
+                                    className={`online-image-indicator ${idx === currentIndex ? 'online-active' : ''}`} />
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
-                        
-                        {product.off > 0 && !showPriceAtCheckout && (
-                          <div className="online-discount-badge">{product.off}% OFF</div>
-                        )}
 
-                        {hasMultipleImages && (
-                          <>
-                            <button className="online-image-nav-btn online-prev"
-                              onClick={(e) => handlePrevImage(product.id, product.images.length, e)}>
-                              <ChevronLeft size={20} color="#333" />
-                            </button>
-                            <button className="online-image-nav-btn online-next"
-                              onClick={(e) => handleNextImage(product.id, product.images.length, e)}>
-                              <ChevronRight size={20} color="#333" />
-                            </button>
-                            <div className="online-image-indicators">
-                              {product.images.map((_, idx) => (
-                                <div key={idx}
-                                  className={`online-image-indicator ${idx === currentIndex ? 'online-active' : ''}`} />
-                              ))}
+                        <div className="card-body p-3">
+                          <div className="online-category-badge">
+                            <Tag size={12} />
+                            <span>{product.category}</span>
+                          </div>
+                          <h3 className="online-product-title">{product.modelName}</h3>
+                          <p className="online-product-description">{product.description}</p>
+                          
+                          {showPriceAtCheckout ? (
+                            <div className="online-price-on-checkout">
+                              <div className="online-price-on-checkout-title">💰 Custom Pricing</div>
+                              <p className="online-price-on-checkout-text">
+                                Price will be decided at checkout based on your requirements
+                              </p>
                             </div>
-                          </>
-                        )}
-                      </div>
+                          ) : (
+                            <div className="online-price-section">
+                              <span className="online-final-price">₹{product.finalPrice}</span>
+                              {product.off > 0 && (
+                                <span className="online-original-price">₹{product.price}</span>
+                              )}
+                            </div>
+                          )}
 
-                      <div className="card-body p-3">
-                        <div className="online-category-badge">
-                          <Tag size={12} />
-                          <span>{product.category}</span>
-                        </div>
-                        <h3 className="online-product-title">{product.modelName}</h3>
-                        <p className="online-product-description">{product.description}</p>
-                        
-                        {showPriceAtCheckout ? (
-                          <div className="online-price-on-checkout">
-                            <div className="online-price-on-checkout-title">💰 Custom Pricing</div>
-                            <p className="online-price-on-checkout-text">
-                              Price will be decided at checkout based on your requirements
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="online-price-section">
-                            <span className="online-final-price">₹{product.finalPrice}</span>
-                            {product.off > 0 && (
-                              <span className="online-original-price">₹{product.price}</span>
-                            )}
-                          </div>
-                        )}
+                          {product.customizeQuestion && (
+                            <div className="online-customize-box">
+                              <strong>Customizable:</strong> {product.customizeQuestion}
+                            </div>
+                          )}
 
-                        {product.customizeQuestion && (
-                          <div className="online-customize-box">
-                            <strong>Customizable:</strong> {product.customizeQuestion}
+                          <div className="online-action-buttons">
+                            <button 
+                              className="online-btn-add-cart" 
+                              onClick={(e) => handleAddToCart(product, e)}
+                              disabled={isAddingToCart}
+                            >
+                              {isAddingToCart ? (
+                                <>
+                                  <div className="online-btn-spinner"></div>
+                                  Adding...
+                                </>
+                              ) : (
+                                <>
+                                  <ShoppingCart size={16} /> Add to Cart
+                                </>
+                              )}
+                            </button>
+                            <button className="online-btn-buy-now" onClick={(e) => handleBuyNow(product, e)}>
+                              <Zap size={16} /> Buy Now
+                            </button>
                           </div>
-                        )}
-
-                        <div className="online-action-buttons">
-                          <button 
-                            className="online-btn-add-cart" 
-                            onClick={(e) => handleAddToCart(product, e)}
-                            disabled={isAddingToCart}
-                          >
-                            {isAddingToCart ? (
-                              <>
-                                <div className="online-btn-spinner"></div>
-                                Adding...
-                              </>
-                            ) : (
-                              <>
-                                <ShoppingCart size={16} /> Add to Cart
-                              </>
-                            )}
-                          </button>
-                          <button className="online-btn-buy-now" onClick={(e) => handleBuyNow(product, e)}>
-                            <Zap size={16} /> Buy Now
-                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {showLoginPopup && (
