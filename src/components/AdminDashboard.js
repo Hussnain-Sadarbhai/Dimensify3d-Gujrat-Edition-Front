@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon } from 'lucide-react';
+import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon, PaperclipIcon } from 'lucide-react';
 import logo from "../images/logo-1.png"
 import { useNavigate } from 'react-router-dom';
 
@@ -147,6 +147,10 @@ function AdminDashboard() {
          navigate("/adminlandingpage")
     }
 
+     function goTapq(){
+         navigate("/admintapq")
+    }
+
     const menuItems = [
         {
             title: 'Help Requests',
@@ -189,6 +193,12 @@ function AdminDashboard() {
             icon:ListOrdered,
             onClick: goOrderUpdate,
             description: 'Download Orders Bills'
+        },
+        {
+            title: 'TAPQ Section',
+            icon:PaperclipIcon,
+            onClick: goTapq,
+            description: 'Create Order invoice, quotation etc'
         },
         {
             title: 'Landing Page Orders',

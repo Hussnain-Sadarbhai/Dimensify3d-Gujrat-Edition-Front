@@ -47,6 +47,7 @@ import AdminPageViewCount from "./components/AdminPromotionvisit";
 import AdminLandingPage from "./components/AdminLandingPage";
 import MyHelpReq from "./components/MyHelpReq";
 import Header2 from "./components/Header2";
+import AdminTapq from "./components/AdminTapq";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -207,6 +208,14 @@ function App() {
               element={
                 <ProtectedAdminRoute>
                   <AdminLandingPage />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/admintapq"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminTapq />
                 </ProtectedAdminRoute>
               }
             />
