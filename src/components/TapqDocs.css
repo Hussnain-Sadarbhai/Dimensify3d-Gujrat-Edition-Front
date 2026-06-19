@@ -1,0 +1,301 @@
+.tapqdocs-admin {
+  min-height: 100vh;
+  background: #f4f6f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1a2332;
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────── */
+.tapqdocs-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 28px;
+  background: #1a2332;
+  color: #fff;
+}
+
+.tapqdocs-logo-img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.tapqdocs-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.2px;
+}
+
+.tapqdocs-header p {
+  font-size: 12.5px;
+  margin: 2px 0 0;
+  color: #aab4c4;
+}
+
+.tapqdocs-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tapqdocs-btn-new {
+  background: #3a7bd5;
+  color: #fff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tapqdocs-btn-new:hover {
+  background: #2f68b8;
+}
+
+.tapqdocs-btn-refresh {
+  background: transparent;
+  color: #e1e6ee;
+  border: 1px solid #3a4458;
+  padding: 9px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.tapqdocs-btn-refresh:hover:not(:disabled) {
+  background: #232d40;
+}
+.tapqdocs-btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── CONTAINER ───────────────────────────────────────────────────────── */
+.tapqdocs-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 24px 60px;
+}
+
+/* ── FILTERS ─────────────────────────────────────────────────────────── */
+.tapqdocs-filters-card {
+  display: flex;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e1e6ee;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.tapqdocs-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.tapqdocs-search-group {
+  flex: 1;
+  min-width: 280px;
+}
+
+.tapqdocs-filter-group label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #5a6680;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.tapqdocs-filter-group select,
+.tapqdocs-filter-group input {
+  padding: 9px 10px;
+  border: 1px solid #d4dae4;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: #1a2332;
+  background: #fff;
+}
+
+.tapqdocs-filter-group select:focus,
+.tapqdocs-filter-group input:focus {
+  outline: none;
+  border-color: #3a7bd5;
+}
+
+/* ── STATES ──────────────────────────────────────────────────────────── */
+.tapqdocs-loading-state,
+.tapqdocs-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #8c9bb5;
+  font-size: 14px;
+  background: #fff;
+  border: 1px dashed #d4dae4;
+  border-radius: 10px;
+}
+
+.tapqdocs-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fdeceb;
+  border: 1px solid #f2b8b5;
+  color: #b42828;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+}
+
+.tapqdocs-error-banner button {
+  margin-left: auto;
+  background: #b42828;
+  color: #fff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── TABLE ───────────────────────────────────────────────────────────── */
+.tapqdocs-table-card {
+  background: #fff;
+  border: 1px solid #e1e6ee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tapqdocs-table-header,
+.tapqdocs-table-row {
+  display: grid;
+  grid-template-columns: 110px 130px 1.4fr 130px 110px 110px 150px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.tapqdocs-table-header {
+  background: #1a2332;
+  color: #aab4c4;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.tapqdocs-table-body .tapqdocs-table-row {
+  border-top: 1px solid #eef1f6;
+  font-size: 13px;
+}
+
+.tapqdocs-table-body .tapqdocs-table-row:hover {
+  background: #f8fafc;
+}
+
+.tapqdocs-type-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.tapqdocs-type-badge--taxInvoices {
+  background: #e3f0ff;
+  color: #1f5fad;
+}
+.tapqdocs-type-badge--quotations {
+  background: #fff3da;
+  color: #9a6a00;
+}
+.tapqdocs-type-badge--proformaInvoices {
+  background: #e9e3ff;
+  color: #5b3aad;
+}
+.tapqdocs-type-badge--advancePaymentReceipts {
+  background: #dff5e8;
+  color: #1e8c50;
+}
+
+.tapqdocs-invoice-num {
+  font-weight: 600;
+  color: #1a2332;
+  font-variant-numeric: tabular-nums;
+}
+
+.tapqdocs-cust-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tapqdocs-cust-name {
+  font-weight: 600;
+  color: #1a2332;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tapqdocs-cust-sub {
+  font-size: 11.5px;
+  color: #8c9bb5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tapqdocs-date-cell {
+  color: #5a6680;
+  font-size: 12.5px;
+}
+
+.tapqdocs-total-cell {
+  font-weight: 600;
+  color: #1a2332;
+}
+
+.tapqdocs-btn-regenerate {
+  background: #3a7bd5;
+  color: #fff;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 100%;
+}
+.tapqdocs-btn-regenerate:hover:not(:disabled) {
+  background: #2f68b8;
+}
+.tapqdocs-btn-regenerate:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+@media (max-width: 880px) {
+  .tapqdocs-table-header {
+    display: none;
+  }
+  .tapqdocs-table-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 14px 16px;
+  }
+  .tapqdocs-btn-regenerate {
+    margin-top: 6px;
+  }
+}
