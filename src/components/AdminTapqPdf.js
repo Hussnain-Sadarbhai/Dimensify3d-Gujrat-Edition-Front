@@ -379,7 +379,7 @@ export const generatePDF = async (params) => {
   const W = 595.28,
     ML = 28,
     MR = 28,
-    MT = 22;
+    MT = 28;
 
   const C = {
     darkBlue: [26, 35, 50],
@@ -394,9 +394,26 @@ export const generatePDF = async (params) => {
     green: [30, 140, 80],
   };
 
+  // ── HEADER CONSTANTS ─────────────────────────────────────────────────────
+  // Fixed header band height — same for ALL document types
+  const HEADER_BAND_H = 96; // total header height in pt
+  const LOGO_SIZE = 84;     // logo width & height (square)
+
+  // Auto-scale doc title font so long titles never overflow into brand area.
+  // "TAX INVOICE" / "QUOTATION" / "PROFORMA INVOICE" → 24pt
+  // "ADVANCE PAYMENT RECEIPT" → shrink to fit
+  const getDocTitleSize = (text) => {
+    if (text.length <= 16) return 24;
+    if (text.length <= 20) return 20;
+    return 16; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 16pt
+  };
+  const docTitleSize = getDocTitleSize(docType);
+
   const simulateLayout = () => {
     let sy = MT;
-    sy += 30 + 6;
+
+    // Header band (fixed height) + separator gap + post-separator gap
+    sy += HEADER_BAND_H + 6 + 18;
 
     const addrLines = Math.ceil(custAddress.length / 38);
     const btHeight = 12 + 11 + addrLines * 10 + 10 + 10 + 10;
@@ -406,13 +423,13 @@ export const generatePDF = async (params) => {
 
     sy += 16 + Math.max(items.length, 5) * 18 + 1;
 
-    sy += 6;
+    sy += 24;
     const gstRows = gst.type === "igst" ? 2 : 3;
-    sy += gstRows * 12 + 2 + 1 + 6 + 10;
+    sy += gstRows * 12 + 8 + 1 + 10 + 10;
     if (params.appliedAdvances?.length > 0) {
       sy += params.appliedAdvances.length * 12 + 2;
       if (params.appliedAdvances.length > 1) sy += 12 + 2;
-      sy += 1 + 6 + 10;
+      sy += 8 + 1 + 10 + 10;
     }
     sy += 3;
     sy += 8 + 42 + 8 + 8 + 7;
@@ -443,13 +460,13 @@ export const generatePDF = async (params) => {
     const rightH = calcColHeight(TERMS_DATA.slice(half));
     sy += Math.max(leftH, rightH);
 
-    sy += 20;
+    sy += 20 + 26 + 10;
     return sy;
   };
 
   const contentH = simulateLayout();
-  const footerBarH = 20;
-  const H = contentH + footerBarH + 8;
+  // Add generous bottom padding; top is already included in simulateLayout via MT
+  const H = contentH + 100;
 
   const doc = new jsPDF({
     unit: "pt",
@@ -484,17 +501,75 @@ export const generatePDF = async (params) => {
     doc.text(str, x, y, opts || {});
   };
 
+  // ── PRELOAD LOGO AS BASE64 ────────────────────────────────────────────
+  const getLogoDataURL = () =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve(null);
+      img.src = logo;
+    });
+
+  const logoDataURL = await getLogoDataURL();
+
+  // ── ═══════════════════════════════════════════════════════════════════
+  //    STRUCTURED HEADER — identical layout for ALL document types
+  //    Layout: [LOGO] [BRAND TEXT]          [DOC TITLE]
+  //    Everything is vertically centered within HEADER_BAND_H
+  // ── ═══════════════════════════════════════════════════════════════════
+
   let y = MT;
-  if (logo) doc.addImage(logo, "PNG", ML, y - 3, 36, 36);
-  sf("bold", 13, C.darkBlue);
-  tx("DIMENSIFY3D", ML + 46, y + 15);
-  sf("normal", 8, C.grey);
-  tx("3D Printing Services", ML + 46, y + 27);
-  sf("bold", 22, C.darkBlue);
-  tx(docType, W - MR, y + 24, { align: "right" });
-  y += 46;
-  ln(ML, y, W - MR, y, C.lightGrey, 1);
+
+  // Header band top Y = MT, bottom Y = MT + HEADER_BAND_H
+  const headerTopY = MT;
+  const headerMidY = headerTopY + HEADER_BAND_H / 2; // vertical center of band
+
+  // ── Logo: vertically centered in header band ──────────────────────────
+  const logoX = ML;
+  const logoY = headerMidY - LOGO_SIZE / 2; // centered vertically
+  if (logoDataURL) {
+    doc.addImage(logoDataURL, "PNG", logoX, logoY, LOGO_SIZE, LOGO_SIZE);
+  }
+
+  // ── Brand text: stacked, tightly next to logo, vertically centered ────
+  const brandNameSize = 15;
+  const taglineSize = 8.5;
+  const brandLineGap = 5;  // tight gap between name and tagline
+  const brandBlockH = brandNameSize + brandLineGap + taglineSize;
+  const brandTextX = logoX + LOGO_SIZE - 4; // slight overlap — brand text flush against logo
+
+  // Baseline of brand name so the whole text block is vertically centered
+  const brandNameBaselineY = headerMidY - brandBlockH / 2 + brandNameSize;
+  const taglineBaselineY = brandNameBaselineY + brandLineGap + taglineSize;
+
+  sf("bold", brandNameSize, C.darkBlue);
+  tx("DIMENSIFY3D", brandTextX, brandNameBaselineY);
+
+  sf("normal", taglineSize, C.grey);
+  tx("3D Printing Services", brandTextX, taglineBaselineY);
+
+  // ── Document title: right-aligned, vertically centered ────────────────
+  // docTitleSize is auto-scaled above so even long titles never overflow
+  const docTitleBaselineY = headerMidY + docTitleSize / 2 - 2; // optical center
+
+  sf("bold", docTitleSize, C.darkBlue);
+  tx(docType, W - MR, docTitleBaselineY, { align: "right" });
+
+  // ── Dark separator line below header ──────────────────────────────────
+  y = headerTopY + HEADER_BAND_H + 6;
+  ln(ML, y, W - MR, y, C.darkBlue, 1.5);
   y += 18;
+
+  // ── ═══════════════════════════════════════════════════════════════════
+  //    REST OF DOCUMENT (unchanged from original)
+  // ── ═══════════════════════════════════════════════════════════════════
 
   const c1 = ML,
     c2 = ML + 158,
@@ -570,8 +645,7 @@ export const generatePDF = async (params) => {
   });
 
   let bt = secTopY;
-  
-  // ── CONDITIONAL HEADER FOR ADVANCE PAYMENT ────────────────────────────
+
   let billToLabel = "BILLED TO";
   if (docType === "ADVANCE PAYMENT RECEIPT") {
     billToLabel = "PAYMENT FROM";
@@ -648,9 +722,11 @@ export const generatePDF = async (params) => {
     ln(ML, y + 18, W - MR, y + 18, C.lightGrey);
     y += 18;
   }
-  ln(ML, y, W - MR, y, C.darkBlue, 1);
 
-  y += 8;
+  y += 12;
+  ln(ML, y, W - MR, y, C.darkBlue, 1);
+  y += 12;
+
   const tRX = W - MR - 220;
   const { taxable, gstTotal } = params;
 
@@ -668,9 +744,9 @@ export const generatePDF = async (params) => {
     totRow("CGST @ " + gst.cgst + "%", rs((taxable * gst.cgst) / 100));
     totRow("SGST @ " + gst.sgst + "%", rs((taxable * gst.sgst) / 100));
   }
-  y += 2;
+  y += 12;
   ln(tRX - 60, y, W - MR, y, C.darkBlue, 1);
-  y += 6;
+  y += 12;
   totRow("Total Amount", rs(total), true);
 
   if (params.appliedAdvances?.length > 0) {
@@ -685,22 +761,21 @@ export const generatePDF = async (params) => {
       y += 2;
       totRow("Total Advance Paid", "- " + rs(totalAdvance), false, C.green);
     }
-    y += 2;
+    y += 12;
     ln(tRX - 60, y, W - MR, y, C.accent, 1);
-    y += 6;
+    y += 12;
     totRow("Balance Payable", rs(balancePayable), true, C.accent);
   }
 
   y += 4;
   sf("bold", 8.5, C.darkBlue);
   const wordsAmt = totalAdvance > 0 ? balancePayable : total;
-  
-  // ── CONDITIONAL AMOUNT TEXT FOR ADVANCE PAYMENT ────────────────────────
+
   let amountLabel = "BALANCE IN WORDS: ";
   if (docType === "ADVANCE PAYMENT RECEIPT") {
     amountLabel = "ADVANCE AMOUNT IN WORDS: ";
   }
-  
+
   tx(amountLabel + numToWords(wordsAmt), ML, y);
 
   y += 8;
@@ -767,8 +842,7 @@ export const generatePDF = async (params) => {
   y += 10;
   sf("bold", 9, C.darkBlue);
   tx("FCLPB9057E", bCol1, y);
-  
-  // ── CONDITIONAL PAYMENT MODE ──────────────────────────────────────────
+
   let paymentMode = "20% Adv. & Balance On Completion";
   if (docType === "ADVANCE PAYMENT RECEIPT") {
     paymentMode = "Advance Payment";
@@ -777,7 +851,7 @@ export const generatePDF = async (params) => {
   } else if (docType === "PROFORMA INVOICE") {
     paymentMode = "100% Advance";
   }
-  
+
   sf("normal", 8.5, C.darkBlue);
   tx(paymentMode, bCol1 + 90, y);
   sf("normal", 8.5, C.darkBlue);
@@ -830,18 +904,20 @@ export const generatePDF = async (params) => {
   const rightEndY = renderTermsCol(termsRight, termsCol2X, y);
   y = Math.max(leftEndY, rightEndY);
 
-  y += 8;
-  const footerY = y + 14;
-  rx(ML - 2, footerY - 13, W - ML - MR + 4, 20, C.darkBlue);
+  // ── FOOTER ────────────────────────────────────────────────────────────
+  y += 20;
+  const footerBarH = 26;
+  const footerTopY = y;
+  const footerTextY = footerTopY + 17;
+
+  rx(0, footerTopY, W, footerBarH, C.darkBlue);
   sf("normal", 8, C.white);
   tx(
     "For any enquiry, reach out via email at print.dimensify3d@gmail.com, call on +91 90193 03569",
     W / 2,
-    footerY,
+    footerTextY,
     { align: "center" }
   );
-
-  doc.internal.pageSize.height = footerY + 10;
 
   // ── FILE NAMING BASED ON DOCUMENT TYPE ────────────────────────────────
   let fileName = "Dimensify3D_Invoice_";

@@ -21,30 +21,22 @@ import {
 import API_BASE_URL from "./apiConfig";
 
 // ── INVOICE NUMBER SEQUENCE ────────────────────────────────────────────────
-// Backend now does all the work (reading the counters node + formatting).
-// We just call the lightweight endpoint and use what it gives us.
 const FALLBACK_NEXT_INVOICE_NUMBERS = {
-  "TAX INVOICE": "D3D-T-A364",
-  "QUOTATION": "D3D-Q-A364",
-  "PROFORMA INVOICE": "D3D-P-A364",
-  "ADVANCE PAYMENT RECEIPT": "D3D-A-A364",
+  "TAX INVOICE": "D3D-TA364",
+  "QUOTATION": "D3D-QA364",
+  "PROFORMA INVOICE": "D3D-PA364",
+  "ADVANCE PAYMENT RECEIPT": "D3D-AA364",
 };
 
-// Fetches the next invoice number for every document type in one go.
-// Returns an object like:
-// { "TAX INVOICE": "D3D-T-A365", "QUOTATION": "D3D-Q-A364", ... }
 async function fetchNextInvoiceNumbers() {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/tapq/next-invoice-numbers`,
     );
     const data = await response.json();
-
     if (!response.ok || !data.success || !data.data?.nextNumbers) {
-      // API failed — fall back to safe defaults so the form still works.
       return { ...FALLBACK_NEXT_INVOICE_NUMBERS };
     }
-
     return data.data.nextNumbers;
   } catch (err) {
     console.error("Failed to fetch next invoice numbers:", err);
@@ -52,9 +44,56 @@ async function fetchNextInvoiceNumbers() {
   }
 }
 
-// Converts a docType constant like "ADVANCE PAYMENT RECEIPT" into a
-// human-friendly label like "Advance Payment Receipt" for use in the
-// Invoice Number field's dynamic label.
+// ── FETCH & EXTRACT UNIQUE CUSTOMERS FROM ALL DOCUMENTS ───────────────────
+// Returns an array of unique customer objects, deduplicated by phone number.
+// Most-recent document for each phone wins (higher createdAt takes precedence).
+async function fetchExistingCustomers(apiBaseUrl) {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/tapq/get-all-documents`);
+    const data = await response.json();
+    if (!response.ok || !data.success || !data.data?.documents) return [];
+
+    const { documents } = data.data;
+    const subcollections = [
+      "taxInvoices",
+      "quotations",
+      "proformaInvoices",
+      "advancePaymentReceipts",
+    ];
+
+    // Map from phone → { customer, createdAt } to keep the most-recent record
+    const byPhone = new Map();
+
+    for (const sub of subcollections) {
+      const docs = documents[sub] || [];
+      for (const doc of docs) {
+        const c = doc.customer;
+        if (!c || !c.phone) continue;
+        const existing = byPhone.get(c.phone);
+        if (!existing || (doc.createdAt || 0) > existing.createdAt) {
+          byPhone.set(c.phone, {
+            createdAt: doc.createdAt || 0,
+            customer: {
+              name: c.name || "",
+              phone: c.phone || "",
+              address: c.address || "",
+              email: c.email || "",
+              state: c.state || "",
+            },
+          });
+        }
+      }
+    }
+
+    return Array.from(byPhone.values())
+      .map((v) => v.customer)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    console.error("Failed to fetch existing customers:", err);
+    return [];
+  }
+}
+
 function formatDocTypeLabel(docType) {
   if (!docType) return "Invoice";
   return docType
@@ -64,15 +103,7 @@ function formatDocTypeLabel(docType) {
     .join(" ");
 }
 
-function NumInput({
-  value,
-  onChange,
-  placeholder,
-  className,
-  style,
-  min,
-  step,
-}) {
+function NumInput({ value, onChange, placeholder, className, style, min, step }) {
   const handleWheel = (e) => e.target.blur();
   const displayVal = value === 0 || value === "0" || value === "" ? "" : value;
   return (
@@ -90,6 +121,28 @@ function NumInput({
         if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
       }}
     />
+  );
+}
+
+// ── CUSTOMER AUTOFILL DROPDOWN ────────────────────────────────────────────
+function CustomerSuggest({ suggestions, onSelect }) {
+  if (!suggestions.length) return null;
+  return (
+    <ul className="tapq-customer-suggest">
+      {suggestions.map((c) => (
+        <li
+          key={c.phone}
+          className="tapq-customer-suggest-item"
+          onMouseDown={(e) => {
+            e.preventDefault(); // prevent blur from firing before click
+            onSelect(c);
+          }}
+        >
+          <span className="tapq-suggest-name">{c.name}</span>
+          <span className="tapq-suggest-phone">{c.phone}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -111,17 +164,19 @@ export default function AdminTapq() {
   const [advanceEntryCounter, setAdvanceEntryCounter] = useState(1);
 
   // ── save state ─────────────────────────────────────────────────────────
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
+  const [saveStatus, setSaveStatus] = useState("idle");
   const [saveError, setSaveError] = useState(null);
 
   // ── invoice number sequence state ─────────────────────────────────────
-  // Cache of next-available numbers per doc type, fetched from the backend.
   const [nextInvoiceNumbers, setNextInvoiceNumbers] = useState(null);
   const [invoiceNumLoading, setInvoiceNumLoading] = useState(false);
-  // Tracks whether the current invoiceNum value in formData was set by us
-  // (auto-fill) rather than typed by the user — so switching docType
-  // doesn't clobber a manual edit.
-  const wasAutoFilledRef = useRef(true);
+
+  // ── CUSTOMER AUTOFILL STATE ───────────────────────────────────────────
+  const [allCustomers, setAllCustomers] = useState([]);         // full list from DB
+  const [nameSuggestions, setNameSuggestions] = useState([]);   // filtered for name field
+  const [phoneSuggestions, setPhoneSuggestions] = useState([]); // filtered for phone field
+  const [showNameSuggest, setShowNameSuggest] = useState(false);
+  const [showPhoneSuggest, setShowPhoneSuggest] = useState(false);
 
   const qrCanvasRef = useRef(null);
 
@@ -129,18 +184,18 @@ export default function AdminTapq() {
     const d = new Date();
     d.setDate(d.getDate() + 15);
     const p = (n) => String(n).padStart(2, "0");
-    return (
-      d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate())
-    );
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
   };
 
   useEffect(() => {
     setDueDate(computeDefaultDueDate());
   }, []);
 
-  // Loads the next-invoice-number map from the backend and applies the
-  // value for the currently selected docType into the form (only if the
-  // user hasn't manually overridden the field).
+  // Fetch existing customers once on mount
+  useEffect(() => {
+    fetchExistingCustomers(API_BASE_URL).then(setAllCustomers);
+  }, []);
+
   const loadAndApplyInvoiceNumbers = async (docTypeToApply) => {
     setInvoiceNumLoading(true);
     try {
@@ -150,15 +205,12 @@ export default function AdminTapq() {
       const nextNum = map[targetDocType];
       if (nextNum) {
         setFormData((prev) => ({ ...prev, invoiceNum: nextNum }));
-        wasAutoFilledRef.current = true;
       }
     } finally {
       setInvoiceNumLoading(false);
     }
   };
 
-  // Fetch sequence numbers once on mount and auto-fill the field for the
-  // initially selected document type.
   useEffect(() => {
     loadAndApplyInvoiceNumbers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,42 +228,81 @@ export default function AdminTapq() {
     setAdvanceEntryCounter(1);
     setSaveStatus("idle");
     setSaveError(null);
-    wasAutoFilledRef.current = true;
+    setNameSuggestions([]);
+    setPhoneSuggestions([]);
+    setShowNameSuggest(false);
+    setShowPhoneSuggest(false);
     if (!skipInvoiceFetch) {
-      // Re-fetch so the next invoice number reflects the document we just
-      // saved (its number is now the new max).
       loadAndApplyInvoiceNumbers(INITIAL_FORM_DATA.docType);
     }
   };
 
+  // ── AUTOFILL: apply a chosen customer into the form ───────────────────
+  const applyCustomer = (customer) => {
+    setFormData((prev) => ({
+      ...prev,
+      custName: customer.name,
+      custPhone: customer.phone,
+      custAddress: customer.address,
+      custEmail: customer.email,
+      custState: customer.state,
+    }));
+    setShowNameSuggest(false);
+    setShowPhoneSuggest(false);
+    setNameSuggestions([]);
+    setPhoneSuggestions([]);
+  };
+
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+
     if (name === "custAddress") {
       const singleLine = value.replace(/[\r\n]+/g, " ");
       setFormData((prev) => ({ ...prev, [name]: singleLine }));
       return;
     }
 
-    if (name === "invoiceNum") {
-      // User is manually editing the invoice number — stop auto-filling
-      // over it until the doc type changes again or fields are refreshed.
-      wasAutoFilledRef.current = false;
-      setFormData((prev) => ({ ...prev, [name]: value }));
-      return;
-    }
+    if (name === "invoiceNum") return; // read-only
 
     if (name === "docType") {
       setFormData((prev) => ({ ...prev, [name]: value }));
-      // Only auto-swap the invoice number if the current value was itself
-      // auto-filled (i.e. the user hasn't manually typed a custom one).
-      if (wasAutoFilledRef.current) {
-        const nextNum = nextInvoiceNumbers?.[value];
-        if (nextNum) {
-          setFormData((prev) => ({ ...prev, invoiceNum: nextNum }));
-        } else {
-          // We don't have a cached number for this type yet — fetch fresh.
-          loadAndApplyInvoiceNumbers(value);
-        }
+      const nextNum = nextInvoiceNumbers?.[value];
+      if (nextNum) {
+        setFormData((prev) => ({ ...prev, invoiceNum: nextNum }));
+      } else {
+        loadAndApplyInvoiceNumbers(value);
+      }
+      return;
+    }
+
+    // ── Customer name: filter suggestions by name ─────────────────────
+    if (name === "custName") {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      if (value.trim().length >= 1) {
+        const q = value.trim().toLowerCase();
+        const matches = allCustomers.filter((c) =>
+          c.name.toLowerCase().includes(q)
+        );
+        setNameSuggestions(matches);
+        setShowNameSuggest(matches.length > 0);
+      } else {
+        setNameSuggestions([]);
+        setShowNameSuggest(false);
+      }
+      return;
+    }
+
+    // ── Customer phone: filter suggestions by phone ───────────────────
+    if (name === "custPhone") {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      if (value.trim().length >= 1) {
+        const q = value.trim();
+        const matches = allCustomers.filter((c) => c.phone.includes(q));
+        setPhoneSuggestions(matches);
+        setShowPhoneSuggest(matches.length > 0);
+      } else {
+        setPhoneSuggestions([]);
+        setShowPhoneSuggest(false);
       }
       return;
     }
@@ -293,9 +384,7 @@ export default function AdminTapq() {
   const handleRemoveAdvanceEntry = (id) => {
     setAdvanceEntries((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      if (updated.length === 0) {
-        setShowAdvanceSection(false);
-      }
+      if (updated.length === 0) setShowAdvanceSection(false);
       return updated;
     });
   };
@@ -327,43 +416,32 @@ export default function AdminTapq() {
   // ── SAVE TO FIREBASE API ──────────────────────────────────────────────────
   const saveDocumentToFirebase = async () => {
     const payload = {
-      // Customer Details
       custName: formData.custName,
       custPhone: formData.custPhone,
       custAddress: formData.custAddress,
       custEmail: formData.custEmail,
       custState: formData.custState,
-
-      // Invoice Details
       invoiceNum: formData.invoiceNum,
       docType: formData.docType,
       gstType: formData.gstType,
       invoiceDate: todayStr(),
       dueDate: dueDate,
-
-      // GST Rates
       gstRates: {
         igstRate: gstRates.igstRate,
         cgstRate: gstRates.cgstRate,
         sgstRate: gstRates.sgstRate,
       },
-
-      // Items (strip internal React id, only send what backend needs)
       items: items.map((item) => ({
         desc: item.desc,
         hsn: item.hsn,
         qty: item.qty,
         price: item.price,
       })),
-
-      // Calculated totals
       taxable,
       gstTotal,
       total,
       totalAdvance,
       balancePayable,
-
-      // Advance payments
       appliedAdvances: appliedAdvances.map((adv) => ({
         advId: adv.advId,
         amount: adv.amount,
@@ -377,62 +455,20 @@ export default function AdminTapq() {
     });
 
     const data = await response.json();
-
     if (!response.ok || !data.success) {
       throw new Error(data.message || "Failed to save document");
     }
-
     return data;
   };
 
-const handleGeneratePDF = async () => {
-  if (!formValid) return;
+  const handleGeneratePDF = async () => {
+    if (!formValid) return;
 
-  setSaveStatus("saving");
-  setSaveError(null);
-
-  try {
-    const [qrData, sigImg, saveResult] = await Promise.all([
-      generateQR(
-        "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
-          (totalAdvance > 0 ? balancePayable : total).toFixed(2) +
-          "&cu=INR",
-        qrCanvasRef
-      ),
-      getSignatureDataURL(),
-      saveDocumentToFirebase(),
-    ]);
-
-    console.log("Document saved:", saveResult.data?.documentId);
-
-    await generatePDF({
-      formData,
-      items,
-      gstRates,
-      dueDate,
-      totalAdvance,
-      balancePayable,
-      total,
-      taxable,
-      gstTotal,
-      qrData,
-      sigImg,
-      appliedAdvances,
-    });
-
-    setSaveStatus("saved");
-    setTimeout(() => {
-      setSaveStatus("idle");
-      handleRefresh(); // ← clears all inputs after success, re-fetches next invoice number
-    }, 4000);
-
-  } catch (error) {
-    console.error("Error during PDF generation or save:", error);
-    setSaveError(error.message || "Something went wrong");
-    setSaveStatus("error");
+    setSaveStatus("saving");
+    setSaveError(null);
 
     try {
-      const [qrData, sigImg] = await Promise.all([
+      const [qrData, sigImg, saveResult] = await Promise.all([
         generateQR(
           "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
             (totalAdvance > 0 ? balancePayable : total).toFixed(2) +
@@ -440,7 +476,10 @@ const handleGeneratePDF = async () => {
           qrCanvasRef
         ),
         getSignatureDataURL(),
+        saveDocumentToFirebase(),
       ]);
+
+      console.log("Document saved:", saveResult.data?.documentId);
 
       await generatePDF({
         formData,
@@ -457,19 +496,54 @@ const handleGeneratePDF = async () => {
         appliedAdvances,
       });
 
-      // PDF downloaded despite save failure — still refresh
+      setSaveStatus("saved");
       setTimeout(() => {
         setSaveStatus("idle");
-        setSaveError(null);
-        handleRefresh(); // ← clears all inputs after PDF download
+        handleRefresh();
+        // Refresh customer list so the newly saved customer appears next time
+        fetchExistingCustomers(API_BASE_URL).then(setAllCustomers);
       }, 4000);
+    } catch (error) {
+      console.error("Error during PDF generation or save:", error);
+      setSaveError(error.message || "Something went wrong");
+      setSaveStatus("error");
 
-    } catch (pdfError) {
-      console.error("PDF generation also failed:", pdfError);
-      // Don't refresh if PDF itself failed — user may want to retry
+      try {
+        const [qrData, sigImg] = await Promise.all([
+          generateQR(
+            "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
+              (totalAdvance > 0 ? balancePayable : total).toFixed(2) +
+              "&cu=INR",
+            qrCanvasRef
+          ),
+          getSignatureDataURL(),
+        ]);
+
+        await generatePDF({
+          formData,
+          items,
+          gstRates,
+          dueDate,
+          totalAdvance,
+          balancePayable,
+          total,
+          taxable,
+          gstTotal,
+          qrData,
+          sigImg,
+          appliedAdvances,
+        });
+
+        setTimeout(() => {
+          setSaveStatus("idle");
+          setSaveError(null);
+          handleRefresh();
+        }, 4000);
+      } catch (pdfError) {
+        console.error("PDF generation also failed:", pdfError);
+      }
     }
-  }
-};
+  };
 
   // ── BUTTON LABEL & STYLE HELPERS ──────────────────────────────────────────
   const getButtonLabel = () => {
@@ -493,7 +567,6 @@ const handleGeneratePDF = async () => {
   return (
     <div className="tapq-admin">
       <header className="tapq-header">
-        <img src={logo} alt="Dimensify3D Logo" className="tapq-logo-img" />
         <div>
           <h1>DIMENSIFY3D — TAPQ</h1>
           <p>Create TAPQ docs</p>
@@ -521,26 +594,53 @@ const handleGeneratePDF = async () => {
         <div className="tapq-card">
           <h2>Customer Details</h2>
           <div className="tapq-form-grid">
-            <div className="tapq-form-group">
+
+            {/* Customer Name with autofill dropdown */}
+            <div className="tapq-form-group tapq-suggest-wrapper">
               <label>Customer Name *</label>
               <input
                 type="text"
                 name="custName"
                 value={formData.custName}
                 onChange={handleFormChange}
+                onFocus={() => {
+                  if (nameSuggestions.length > 0) setShowNameSuggest(true);
+                }}
+                onBlur={() => setTimeout(() => setShowNameSuggest(false), 150)}
                 placeholder="e.g. Rameez Raja Sikandar"
+                autoComplete="off"
               />
+              {showNameSuggest && (
+                <CustomerSuggest
+                  suggestions={nameSuggestions}
+                  onSelect={applyCustomer}
+                />
+              )}
             </div>
-            <div className="tapq-form-group">
+
+            {/* Customer Phone with autofill dropdown */}
+            <div className="tapq-form-group tapq-suggest-wrapper">
               <label>Phone *</label>
               <input
                 type="text"
                 name="custPhone"
                 value={formData.custPhone}
                 onChange={handleFormChange}
+                onFocus={() => {
+                  if (phoneSuggestions.length > 0) setShowPhoneSuggest(true);
+                }}
+                onBlur={() => setTimeout(() => setShowPhoneSuggest(false), 150)}
                 placeholder="e.g. 77094 45566"
+                autoComplete="off"
               />
+              {showPhoneSuggest && (
+                <CustomerSuggest
+                  suggestions={phoneSuggestions}
+                  onSelect={applyCustomer}
+                />
+              )}
             </div>
+
             <div className="tapq-form-group tapq-span2">
               <label>Address *</label>
               <input
@@ -594,8 +694,14 @@ const handleGeneratePDF = async () => {
                 type="text"
                 name="invoiceNum"
                 value={formData.invoiceNum}
-                onChange={handleFormChange}
-                placeholder="e.g. D3D-T-A364"
+                readOnly
+                className="tapq-invoice-num-readonly"
+                title="Invoice number is auto-generated and cannot be modified"
+                style={{
+                  backgroundColor: "#f5f5f5",
+                  cursor: "not-allowed",
+                  opacity: 0.85,
+                }}
               />
             </div>
             <div className="tapq-form-group">
@@ -632,8 +738,8 @@ const handleGeneratePDF = async () => {
           <div className="tapq-notice">
             Invoice Date is automatically set to <strong>today</strong>. Due
             Date is automatically set to <strong>15 days from today</strong>.
-            Invoice Number is auto-filled with the next number in sequence
-            for the selected document type — you can still edit it manually.
+            Invoice Number is auto-generated and{" "}
+            <strong>cannot be modified</strong>.
           </div>
         </div>
 
@@ -982,7 +1088,6 @@ const handleGeneratePDF = async () => {
             {getButtonLabel()}
           </button>
 
-          {/* Save error notice — PDF still downloaded, only DB save failed */}
           {saveStatus === "error" && saveError && (
             <p className="tapq-save-error">
               ⚠ Could not save to database: {saveError}. Your PDF was still
@@ -990,7 +1095,6 @@ const handleGeneratePDF = async () => {
             </p>
           )}
 
-          {/* Success notice */}
           {saveStatus === "saved" && (
             <p className="tapq-save-success">
               ✅ Document saved to database successfully.

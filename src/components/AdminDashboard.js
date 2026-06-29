@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon, PaperclipIcon } from 'lucide-react';
+import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon, PaperclipIcon, LucidePaperclip } from 'lucide-react';
 import logo from "../images/logo-1.png"
 import { useNavigate } from 'react-router-dom';
 
@@ -151,6 +151,10 @@ function AdminDashboard() {
          navigate("/admintapq")
     }
 
+    function goSOa(){
+        navigate("/adminsoa")
+    }
+
     const menuItems = [
         {
             title: 'Help Requests',
@@ -199,6 +203,12 @@ function AdminDashboard() {
             icon:PaperclipIcon,
             onClick: goTapq,
             description: 'Create Order invoice, quotation etc'
+        },
+        {
+            title: 'Statement Of Account',
+            icon:LucidePaperclip,
+            onClick: goSOa,
+            description: 'Create Statement Of Account'
         },
         {
             title: 'Landing Page Orders',

@@ -49,6 +49,7 @@ import MyHelpReq from "./components/MyHelpReq";
 import Header2 from "./components/Header2";
 import AdminTapq from "./components/AdminTapq";
 import TapqDocs from "./components/TapqDocs";
+import AdminSoa from "./components/AdminSoa";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -225,6 +226,14 @@ function App() {
               element={
                 <ProtectedAdminRoute>
                   <TapqDocs />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminsoa"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminSoa />
                 </ProtectedAdminRoute>
               }
             />

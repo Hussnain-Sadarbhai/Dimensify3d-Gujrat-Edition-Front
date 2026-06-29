@@ -33,7 +33,7 @@ const DOC_TYPE_CONFIG = [
   },
   {
     value: "advancePaymentReceipts",
-    label: "Advance Payment Receipts",
+    label: "Advance P R",
     docType: "ADVANCE PAYMENT RECEIPT",
   },
 ];
@@ -272,7 +272,6 @@ export default function TapqDocs() {
   return (
     <div className="tapqdocs-admin">
       <header className="tapqdocs-header">
-        <img src={logo} alt="Dimensify3D Logo" className="tapqdocs-logo-img" />
         <div>
           <h1>DIMENSIFY3D — TAPQ Documents</h1>
           <p>Browse, search, and regenerate previously created TAPQ docs</p>
