@@ -379,7 +379,7 @@ export const generatePDF = async (params) => {
   const W = 595.28,
     ML = 28,
     MR = 28,
-    MT = 28;
+    MT = 0; // no top margin — header sits flush with page top
 
   const C = {
     darkBlue: [26, 35, 50],
@@ -396,7 +396,7 @@ export const generatePDF = async (params) => {
 
   // ── HEADER CONSTANTS ─────────────────────────────────────────────────────
   // Fixed header band height — same for ALL document types
-  const HEADER_BAND_H = 96; // total header height in pt
+  const HEADER_BAND_H = 86; // total header height in pt — tight, matches the bottom margin
   const LOGO_SIZE = 84;     // logo width & height (square)
 
   // Auto-scale doc title font so long titles never overflow into brand area.
@@ -460,13 +460,16 @@ export const generatePDF = async (params) => {
     const rightH = calcColHeight(TERMS_DATA.slice(half));
     sy += Math.max(leftH, rightH);
 
+    // gap before footer + footer bar height + small trailing margin
     sy += 20 + 26 + 10;
     return sy;
   };
 
   const contentH = simulateLayout();
-  // Add generous bottom padding; top is already included in simulateLayout via MT
-  const H = contentH + 100;
+  // simulateLayout() already includes the footer bar and a small trailing
+  // margin below it, so only a gentle extra buffer is needed here — the
+  // previous "+100" was creating a large dead zone below the footer.
+  const H = contentH + 22;
 
   const doc = new jsPDF({
     unit: "pt",
@@ -910,11 +913,11 @@ export const generatePDF = async (params) => {
   const footerTopY = y;
   const footerTextY = footerTopY + 17;
 
-  rx(0, footerTopY, W, footerBarH, C.darkBlue);
+  rx(ML, footerTopY, W - ML - MR, footerBarH, C.darkBlue);
   sf("normal", 8, C.white);
   tx(
     "For any enquiry, reach out via email at print.dimensify3d@gmail.com, call on +91 90193 03569",
-    W / 2,
+    ML + (W - ML - MR) / 2,
     footerTextY,
     { align: "center" }
   );
