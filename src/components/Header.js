@@ -11,6 +11,7 @@ import {
   ChevronDown,
   MessageCircle,
   LogOut,
+  Info, // Added Info icon for About
 } from "lucide-react";
 import logo from "../images/logo-1.png";
 import "./Header.css";
@@ -166,6 +167,11 @@ const Header = () => {
     navigate("/account");
   };
 
+  // NEW: Handler for About page
+  const handleAbout = () => {
+    navigate("/about");
+  };
+
   // Use only product images from API
   const galleryImages =
     products.length > 0
@@ -217,7 +223,12 @@ const Header = () => {
                 </button>
                 <button className="nav-item" onClick={handleOnlineStore}>
                   <Store size={18} />
-                  <span>Online Store</span>
+                  <span>Store</span>
+                </button>
+                {/* NEW: About button */}
+                <button className="nav-item" onClick={handleAbout}>
+                  <Info size={18} />
+                  <span>About</span>
                 </button>
                 <div className="cart-container">
                   <button className="nav-item" onClick={handleCart}>
@@ -275,6 +286,11 @@ const Header = () => {
               <button className="mobile-nav-item" onClick={handleOnlineStore}>
                 <Store size={18} />
                 <span>Online Store</span>
+              </button>
+              {/* NEW: About button for mobile */}
+              <button className="mobile-nav-item" onClick={handleAbout}>
+                <Info size={18} />
+                <span>About</span>
               </button>
               <div style={{ position: "relative" }}>
                 <button className="mobile-nav-item" onClick={handleCart}>
