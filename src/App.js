@@ -43,13 +43,13 @@ import OnlineStoreLogin from "./components/OnlineStoreLogin";
 import Promotion from "./components/Promotion_page";
 import Form from "./components/Forms";
 import AdminPageViewCount from "./components/AdminPromotionvisit";
-// import LandingPage from "./components/LandingPage";
 import AdminLandingPage from "./components/AdminLandingPage";
 import MyHelpReq from "./components/MyHelpReq";
 import Header2 from "./components/Header2";
 import AdminTapq from "./components/AdminTapq";
 import TapqDocs from "./components/TapqDocs";
 import AdminSoa from "./components/AdminSoa";
+import LandingPage from "./components/LandingPage";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -97,7 +97,7 @@ function App() {
             />
             <Route path="/account" element={<Account />} />
             <Route path="/itemdetails" element={<ItemDetails />} />
-            {/* <Route path="/landing-page" element={<LandingPage/>} /> */}
+            <Route path="/landing-page" element={<LandingPage/>} />
             <Route path="/myhelprequest" element={<MyHelpReq/>} />
 
             {/* Protected Admin Routes */}
