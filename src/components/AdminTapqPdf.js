@@ -114,9 +114,11 @@ export const INITIAL_FORM_DATA = {
   custAddress: "",
   custEmail: "",
   custState: "Karnataka, Code : 29",
+  custGstin: "", // NEW — optional, shown in BILLED TO if present
   invoiceNum: "",
   docType: "TAX INVOICE",
   gstType: "igst",
+  specialNotes: "", // NEW — optional, shown below AMOUNT IN WORDS if present
 };
 
 export const INITIAL_GST_RATES = {
@@ -180,9 +182,7 @@ export const numToWords = (n) => {
         (ones[x % 10] ? ones[x % 10] + " " : "")
       );
     return (
-      ones[Math.floor(x / 100)] +
-      " Hundred " +
-      (x % 100 ? chunk(x % 100) : "")
+      ones[Math.floor(x / 100)] + " Hundred " + (x % 100 ? chunk(x % 100) : "")
     );
   }
   let r = "";
@@ -204,6 +204,8 @@ export const numToWords = (n) => {
 };
 
 // ── FORM VALIDATION ──────────────────────────────────────────────────────────
+// custGstin and specialNotes are intentionally NOT checked here — they stay
+// fully optional and never affect form validity.
 
 export const isFormValid = (formData, items) => {
   if (!formData.custName.trim()) return false;
@@ -212,7 +214,7 @@ export const isFormValid = (formData, items) => {
   if (!formData.invoiceNum.trim()) return false;
   if (items.length === 0) return false;
   const hasInvalidItem = items.some(
-    (item) => !item.desc.trim() || item.price <= 0 || item.qty <= 0
+    (item) => !item.desc.trim() || item.price <= 0 || item.qty <= 0,
   );
   if (hasInvalidItem) return false;
   return true;
@@ -249,7 +251,7 @@ export const getGstInfo = (gstType, gstRates) => {
   }
 };
 
-export const calculateTotals = (items, gstType, gstRates, advanceEntries) => {
+export const calculateTotals = (items, gstType, gstRates, roundOffEntries) => {
   const gst = getGstInfo(gstType, gstRates);
   let taxable = 0;
   items.forEach((item) => {
@@ -260,24 +262,47 @@ export const calculateTotals = (items, gstType, gstRates, advanceEntries) => {
   const gstTotal = (taxable * gst.rate) / 100;
   const total = taxable + gstTotal;
 
-  const appliedAdvances = advanceEntries.filter(
-    (e) => e.applied && parseFloat(e.amount) > 0
+  // Round-off entries: each is applied with a sign ('+' or '-') and adjusts
+  // the final total directly. Fixed label "Round off" — no payment ID.
+  const appliedRoundOffs = (roundOffEntries || []).filter(
+    (e) => e.applied && parseFloat(e.amount) > 0,
   );
-  const totalAdvance = appliedAdvances.reduce(
-    (sum, e) => sum + (parseFloat(e.amount) || 0),
-    0
-  );
-  const balancePayable = Math.max(0, total - totalAdvance);
+  const totalRoundOff = appliedRoundOffs.reduce((sum, e) => {
+    const amt = parseFloat(e.amount) || 0;
+    return sum + (e.sign === "-" ? -amt : amt);
+  }, 0);
+
+  const finalTotal = total + totalRoundOff;
+  const balancePayable = finalTotal;
 
   return {
     taxable,
     gstTotal,
     total,
     gst,
-    totalAdvance,
+    totalRoundOff,
+    finalTotal,
     balancePayable,
-    appliedAdvances,
+    appliedRoundOffs,
   };
+};
+
+// ── HSN / SAC HEADER LABEL ───────────────────────────────────────────────────
+// Each item now carries its own `codeType` ("HSN" or "SAC"), chosen via the
+// dropdown in the Items table. Since the PDF has a single shared column for
+// this, the column header adapts to what the items actually contain:
+//   - all items are HSN        -> "HSN Code"
+//   - all items are SAC        -> "SAC Code"
+//   - mixed HSN and SAC items  -> "HSN/SAC Code"
+//   - no items                 -> "HSN Code" (safe default)
+export const getCodeColumnLabel = (items) => {
+  if (!items || items.length === 0) return "HSN Code";
+  const types = new Set(items.map((item) => (item.codeType || "HSN")));
+  if (types.size === 1) {
+    const only = [...types][0];
+    return only === "SAC" ? "SAC Code" : "HSN Code";
+  }
+  return "HSN/SAC Code";
 };
 
 // ── QR & SIGNATURE ──────────────────────────────────────────────────────────
@@ -345,11 +370,16 @@ export const generatePDF = async (params) => {
     items,
     gstRates,
     dueDate,
-    totalAdvance,
+    totalRoundOff,
     balancePayable,
     total,
     qrData,
     sigImg,
+    // NEW — when true, the PDF skips drawing the signature image and just
+    // leaves the same reserved space blank, ready for a manual/wet
+    // signature. Defaults to false so behaviour is unchanged unless the
+    // "No Signature" checkbox on the form is ticked.
+    noSignature,
   } = params;
 
   if (!isFormValid(formData, items)) return;
@@ -363,9 +393,19 @@ export const generatePDF = async (params) => {
       .replace(/\s{2,}/g, " ") || "N/A";
   const custEmail = formData.custEmail.trim() || "NA";
   const custState = formData.custState.trim() || "N/A";
+  // NEW — optional fields. Both stay empty-string when not supplied, and
+  // every render/height calc below treats "" as "not present" so the
+  // document looks exactly as before whenever they're left blank.
+  const custGstin = (formData.custGstin || "").trim();
+  const specialNotes = (formData.specialNotes || "").trim();
   const invoiceNum = formData.invoiceNum.trim() || "D3D-XXXXXXXX";
   const invoiceDate = todayStr();
   const docType = formData.docType;
+
+  // Column header for the HSN/SAC column — reflects what codeType(s) the
+  // items actually use (see getCodeColumnLabel above). Everything else
+  // about the table (columns, widths, row content) is unchanged.
+  const codeColumnLabel = getCodeColumnLabel(items);
 
   let dueDateStr = "N/A";
   if (dueDate) {
@@ -396,18 +436,28 @@ export const generatePDF = async (params) => {
 
   // ── HEADER CONSTANTS ─────────────────────────────────────────────────────
   // Fixed header band height — same for ALL document types
-  const HEADER_BAND_H = 86; // total header height in pt — tight, matches the bottom margin
-  const LOGO_SIZE = 84;     // logo width & height (square)
+  // Enlarged to fit the bigger logo + brand text block requested.
+  const HEADER_BAND_H = 110; // total header height in pt
+  const LOGO_SIZE = 108; // logo width & height (square) — enlarged
 
   // Auto-scale doc title font so long titles never overflow into brand area.
-  // "TAX INVOICE" / "QUOTATION" / "PROFORMA INVOICE" → 24pt
-  // "ADVANCE PAYMENT RECEIPT" → shrink to fit
+  // Doc title is intentionally kept SMALL relative to the brand block now
+  // (per reference design): "TAX INVOICE" / "QUOTATION" -> 15pt
+  // "PROFORMA INVOICE" -> 13pt, "ADVANCE PAYMENT RECEIPT" -> shrink to fit
   const getDocTitleSize = (text) => {
-    if (text.length <= 16) return 24;
-    if (text.length <= 20) return 20;
-    return 16; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 16pt
+    if (text.length <= 16) return 15;
+    if (text.length <= 20) return 13;
+    return 11; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 11pt
   };
   const docTitleSize = getDocTitleSize(docType);
+
+  // Rough character-per-line estimate used only for pre-sizing the page
+  // height in simulateLayout() below — mirrors the style already used for
+  // custAddress / terms bullet wrapping estimates elsewhere in this file.
+  const estimateWrappedLines = (text, approxCharsPerLine) => {
+    if (!text) return 0;
+    return Math.max(1, Math.ceil(text.length / approxCharsPerLine));
+  };
 
   const simulateLayout = () => {
     let sy = MT;
@@ -416,7 +466,9 @@ export const generatePDF = async (params) => {
     sy += HEADER_BAND_H + 6 + 18;
 
     const addrLines = Math.ceil(custAddress.length / 38);
-    const btHeight = 12 + 11 + addrLines * 10 + 10 + 10 + 10;
+    // + one extra line if GSTIN is present under BILLED TO
+    const btHeight =
+      12 + 11 + addrLines * 10 + 10 + 10 + 10 + (custGstin ? 10 : 0);
     const byHeight = 12 + 6 * 10;
     const invoiceH = 12 + 4 * 11;
     sy += Math.max(invoiceH, byHeight, btHeight) + 8 + 1 + 18;
@@ -426,12 +478,18 @@ export const generatePDF = async (params) => {
     sy += 24;
     const gstRows = gst.type === "igst" ? 2 : 3;
     sy += gstRows * 12 + 8 + 1 + 10 + 10;
-    if (params.appliedAdvances?.length > 0) {
-      sy += params.appliedAdvances.length * 12 + 2;
-      if (params.appliedAdvances.length > 1) sy += 12 + 2;
+    if (params.appliedRoundOffs?.length > 0) {
+      sy += params.appliedRoundOffs.length * 12 + 2;
       sy += 8 + 1 + 10 + 10;
     }
     sy += 3;
+    // + extra room for the optional Special Notes block (label + wrapped
+    // lines) rendered between "AMOUNT IN WORDS" and the signature block.
+    if (specialNotes) {
+      const notesW = W - ML - MR - 150; // mirrors sigX - ML - 10 at render time
+      const charsPerLine = Math.max(20, Math.floor(notesW / 4.4));
+      sy += 12 + 9 + estimateWrappedLines(specialNotes, charsPerLine) * 9;
+    }
     sy += 8 + 42 + 8 + 8 + 7;
     sy += 22 + 1 + 10;
 
@@ -524,7 +582,7 @@ export const generatePDF = async (params) => {
 
   // ── ═══════════════════════════════════════════════════════════════════
   //    STRUCTURED HEADER — identical layout for ALL document types
-  //    Layout: [LOGO] [BRAND TEXT]          [DOC TITLE]
+  //    Layout: [LOGO] [BRAND TEXT — BIG]          [DOC TITLE — SMALL]
   //    Everything is vertically centered within HEADER_BAND_H
   // ── ═══════════════════════════════════════════════════════════════════
 
@@ -542,9 +600,10 @@ export const generatePDF = async (params) => {
   }
 
   // ── Brand text: stacked, tightly next to logo, vertically centered ────
-  const brandNameSize = 15;
-  const taglineSize = 8.5;
-  const brandLineGap = 5;  // tight gap between name and tagline
+  // Enlarged brand name + tagline to match reference design.
+  const brandNameSize = 26;
+  const taglineSize = 14;
+  const brandLineGap = 6; // gap between name and tagline
   const brandBlockH = brandNameSize + brandLineGap + taglineSize;
   const brandTextX = logoX + LOGO_SIZE - 4; // slight overlap — brand text flush against logo
 
@@ -558,8 +617,7 @@ export const generatePDF = async (params) => {
   sf("normal", taglineSize, C.grey);
   tx("3D Printing Services", brandTextX, taglineBaselineY);
 
-  // ── Document title: right-aligned, vertically centered ────────────────
-  // docTitleSize is auto-scaled above so even long titles never overflow
+  // ── Document title: right-aligned, small, vertically centered ─────────
   const docTitleBaselineY = headerMidY + docTitleSize / 2 - 2; // optical center
 
   sf("bold", docTitleSize, C.darkBlue);
@@ -658,9 +716,6 @@ export const generatePDF = async (params) => {
   tx(billToLabel, c3, bt);
   bt += 12;
   sf("bold", 8.5, C.darkBlue);
-  tx("Customer Representative", c3, bt);
-  bt += 12;
-  sf("bold", 8, C.darkBlue);
   tx(custName, c3, bt);
   bt += 11;
   sf("normal", 7.5, C.darkBlue);
@@ -674,6 +729,12 @@ export const generatePDF = async (params) => {
   tx("Phone: " + custPhone, c3, bt);
   bt += 10;
   tx("State Name: " + custState, c3, bt);
+  // ── Customer GSTIN (optional) — only rendered when supplied, everything
+  //    above stays exactly as before when it's left blank.
+  if (custGstin) {
+    bt += 10;
+    tx("GSTIN: " + custGstin, c3, bt);
+  }
 
   y = Math.max(y, by, bt) + 12;
   ln(ML, y, W - MR, y, C.lightGrey, 1);
@@ -692,7 +753,9 @@ export const generatePDF = async (params) => {
   sf("bold", 8, C.white);
   tx("SI.NO", tNo + 3, y + 14);
   tx("Item", tDesc + 2, y + 14);
-  tx("HSN Code", tHSN + 2, y + 14);
+  // Column header now reflects whether items use HSN, SAC, or a mix of
+  // both — see codeColumnLabel computed above from getCodeColumnLabel().
+  tx(codeColumnLabel, tHSN + 2, y + 14);
   tx("Qty", qtyR, y + 14, { align: "right" });
   tx("Price/Unit", priceR, y + 14, { align: "right" });
   tx("GST Amt", gstR, y + 14, { align: "right" });
@@ -750,40 +813,73 @@ export const generatePDF = async (params) => {
   y += 12;
   ln(tRX - 60, y, W - MR, y, C.darkBlue, 1);
   y += 12;
-  totRow("Total Amount", rs(total), true);
 
-  if (params.appliedAdvances?.length > 0) {
+  // Label switches to "Amount" once a round off is applied, otherwise stays
+  // "Total Amount" — same rule as the on-screen totals grid.
+  totRow(
+    params.appliedRoundOffs?.length > 0 ? "Amount" : "Total Amount",
+    rs(total),
+    true,
+  );
+
+  // ── ROUND OFF ───────────────────────────────────────────────────────────
+  // Every applied round-off entry renders as a single fixed "Round off" line
+  // with a +/- sign, applied directly to the total (no advance/payment-ID
+  // language). If any round-off was applied, the final row (previously
+  // "Balance Payable") is now labeled "Total Amount" = final total.
+  if (params.appliedRoundOffs?.length > 0) {
     y += 2;
-    params.appliedAdvances.forEach((adv, idx) => {
-      const label = adv.advId
-        ? "Advance Paid (" + adv.advId + ")"
-        : "Advance Paid";
-      totRow(label, "- " + rs(parseFloat(adv.amount)), false, C.green);
+    params.appliedRoundOffs.forEach((ro) => {
+      const amt = parseFloat(ro.amount) || 0;
+      const signStr = ro.sign === "-" ? "- " : "+ ";
+      totRow("Round off", signStr + rs(amt), false, C.green);
     });
-    if (params.appliedAdvances.length > 1) {
-      y += 2;
-      totRow("Total Advance Paid", "- " + rs(totalAdvance), false, C.green);
-    }
     y += 12;
     ln(tRX - 60, y, W - MR, y, C.accent, 1);
     y += 12;
-    totRow("Balance Payable", rs(balancePayable), true, C.accent);
+    totRow("Total Amount", rs(balancePayable), true, C.accent);
   }
 
   y += 4;
   sf("bold", 8.5, C.darkBlue);
-  const wordsAmt = totalAdvance > 0 ? balancePayable : total;
+  const wordsAmt = params.appliedRoundOffs?.length > 0 ? balancePayable : total;
 
-  let amountLabel = "BALANCE IN WORDS: ";
+  let amountLabel = "AMOUNT IN WORDS: ";
   if (docType === "ADVANCE PAYMENT RECEIPT") {
     amountLabel = "ADVANCE AMOUNT IN WORDS: ";
   }
 
   tx(amountLabel + numToWords(wordsAmt), ML, y);
 
-  y += 8;
   const sigX = W - MR - 140;
-  if (sigImg) {
+
+  // ── SPECIAL NOTES (optional) ──────────────────────────────────────────
+  // Rendered directly below "AMOUNT IN WORDS" only when the user supplied
+  // something. When left blank, this block is skipped entirely and the
+  // layout below (signature block) falls back exactly to its original
+  // "y += 8" spacing, i.e. unchanged from before.
+  if (specialNotes) {
+    y += 12;
+    sf("bold", 8, C.grey);
+    tx("SPECIAL NOTES:", ML, y);
+    y += 9;
+    sf("normal", 8, C.darkBlue);
+    const notesW = sigX - ML - 10; // keep clear of the signature block
+    doc.splitTextToSize(specialNotes, notesW).forEach((l) => {
+      tx(l, ML, y);
+      y += 9;
+    });
+  }
+
+  y += 8;
+  // ── SIGNATURE (or blank box for manual signature) ─────────────────────
+  // When the "No Signature" checkbox is checked (noSignature === true),
+  // the saved signature image is intentionally NOT drawn. The same 44pt
+  // of vertical space is still reserved below (via "y += 44"), so the
+  // area above the "Authorised Signatory" line simply stays blank —
+  // ready for a manual/wet signature. Nothing else about the layout,
+  // the line, or the label below changes.
+  if (sigImg && !noSignature) {
     doc.addImage(sigImg, "PNG", sigX + 10, y, 120, 44);
   }
   y += 44;
@@ -846,14 +942,10 @@ export const generatePDF = async (params) => {
   sf("bold", 9, C.darkBlue);
   tx("FCLPB9057E", bCol1, y);
 
-  let paymentMode = "20% Adv. & Balance On Completion";
-  if (docType === "ADVANCE PAYMENT RECEIPT") {
-    paymentMode = "Advance Payment";
-  } else if (docType === "QUOTATION") {
-    paymentMode = "As Per Terms";
-  } else if (docType === "PROFORMA INVOICE") {
-    paymentMode = "100% Advance";
-  }
+  // ── MODE/TERM OF PAYMENT ────────────────────────────────────────────
+  // Fixed to "20% Adv." for every document type — Tax Invoice, Quotation,
+  // Proforma Invoice, and Advance Payment Receipt all show the same text.
+  const paymentMode = "20% Adv.";
 
   sf("normal", 8.5, C.darkBlue);
   tx(paymentMode, bCol1 + 90, y);
@@ -919,7 +1011,7 @@ export const generatePDF = async (params) => {
     "For any enquiry, reach out via email at print.dimensify3d@gmail.com, call on +91 90193 03569",
     ML + (W - ML - MR) / 2,
     footerTextY,
-    { align: "center" }
+    { align: "center" },
   );
 
   // ── FILE NAMING BASED ON DOCUMENT TYPE ────────────────────────────────
@@ -933,10 +1025,6 @@ export const generatePDF = async (params) => {
   }
 
   doc.save(
-    fileName +
-      invoiceNum +
-      "_" +
-      invoiceDate.replace(/-/g, "") +
-      ".pdf"
+    fileName + invoiceNum + "_" + invoiceDate.replace(/-/g, "") + ".pdf",
   );
 };

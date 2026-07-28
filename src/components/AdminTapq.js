@@ -23,7 +23,7 @@ import API_BASE_URL from "./apiConfig";
 // ── INVOICE NUMBER SEQUENCE ────────────────────────────────────────────────
 const FALLBACK_NEXT_INVOICE_NUMBERS = {
   "TAX INVOICE": "D3D-TA364",
-  "QUOTATION": "D3D-QA364",
+  QUOTATION: "D3D-QA364",
   "PROFORMA INVOICE": "D3D-PA364",
   "ADVANCE PAYMENT RECEIPT": "D3D-AA364",
 };
@@ -45,8 +45,6 @@ async function fetchNextInvoiceNumbers() {
 }
 
 // ── FETCH & EXTRACT UNIQUE CUSTOMERS FROM ALL DOCUMENTS ───────────────────
-// Returns an array of unique customer objects, deduplicated by phone number.
-// Most-recent document for each phone wins (higher createdAt takes precedence).
 async function fetchExistingCustomers(apiBaseUrl) {
   try {
     const response = await fetch(`${apiBaseUrl}/api/tapq/get-all-documents`);
@@ -61,7 +59,6 @@ async function fetchExistingCustomers(apiBaseUrl) {
       "advancePaymentReceipts",
     ];
 
-    // Map from phone → { customer, createdAt } to keep the most-recent record
     const byPhone = new Map();
 
     for (const sub of subcollections) {
@@ -79,6 +76,7 @@ async function fetchExistingCustomers(apiBaseUrl) {
               address: c.address || "",
               email: c.email || "",
               state: c.state || "",
+              gstin: c.gstin || "",
             },
           });
         }
@@ -103,7 +101,15 @@ function formatDocTypeLabel(docType) {
     .join(" ");
 }
 
-function NumInput({ value, onChange, placeholder, className, style, min, step }) {
+function NumInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+  style,
+  min,
+  step,
+}) {
   const handleWheel = (e) => e.target.blur();
   const displayVal = value === 0 || value === "0" || value === "" ? "" : value;
   return (
@@ -134,7 +140,7 @@ function CustomerSuggest({ suggestions, onSelect }) {
           key={c.phone}
           className="tapq-customer-suggest-item"
           onMouseDown={(e) => {
-            e.preventDefault(); // prevent blur from firing before click
+            e.preventDefault();
             onSelect(c);
           }}
         >
@@ -143,6 +149,357 @@ function CustomerSuggest({ suggestions, onSelect }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// ── REVIEW & CONFIRM MODAL ──────────────────────────────────────────────
+// Shown after the user clicks "Generate Invoice PDF" and before anything
+// actually happens. Nothing is saved to the DB and no PDF is created until
+// the user explicitly clicks "Confirm & Generate" inside this modal.
+// Styled inline (no new CSS file classes) to keep this self-contained.
+function ReviewModal({
+  formData,
+  items,
+  gst,
+  taxable,
+  gstTotal,
+  total,
+  totalRoundOff,
+  balancePayable,
+  appliedRoundOffs,
+  dueDate,
+  noSignature,
+  isSubmitting,
+  onCancel,
+  onConfirm,
+}) {
+  const overlayStyle = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15, 23, 32, 0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px",
+  };
+
+  const boxStyle = {
+    background: "white",
+    borderRadius: "14px",
+    width: "100%",
+    maxWidth: "640px",
+    maxHeight: "88vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+    overflow: "hidden",
+  };
+
+  const headerStyle = {
+    padding: "18px 24px",
+    borderBottom: "1px solid #eef1f6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "linear-gradient(135deg, #1a2332 0%, #2d4a6e 100%)",
+  };
+
+  const bodyStyle = {
+    padding: "20px 24px",
+    overflowY: "auto",
+    flex: 1,
+  };
+
+  const footerStyle = {
+    padding: "16px 24px",
+    borderTop: "1px solid #eef1f6",
+    display: "flex",
+    gap: "12px",
+    justifyContent: "flex-end",
+    background: "#fafbfc",
+  };
+
+  const sectionTitleStyle = {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#3a7bd5",
+    textTransform: "uppercase",
+    letterSpacing: "0.8px",
+    marginBottom: "8px",
+    marginTop: "18px",
+  };
+
+  const rowStyle = {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: "13px",
+    color: "#1a2332",
+    padding: "5px 0",
+    borderBottom: "1px dashed #f0f4f8",
+  };
+
+  const rowLabelStyle = { color: "#5a6a7e" };
+
+  const itemCardStyle = {
+    border: "1px solid #eef1f6",
+    borderRadius: "9px",
+    padding: "10px 12px",
+    marginBottom: "8px",
+    background: "#fafbfc",
+  };
+
+  const codeColLabel =
+    items.length > 0 &&
+    items.every((it) => (it.codeType || "HSN") === items[0].codeType)
+      ? (items[0].codeType || "HSN") === "SAC"
+        ? "SAC"
+        : "HSN"
+      : "HSN/SAC";
+
+  return (
+    <div style={overlayStyle} onMouseDown={onCancel}>
+      <div style={boxStyle} onMouseDown={(e) => e.stopPropagation()}>
+        <div style={headerStyle}>
+          <div>
+            <div style={{ color: "white", fontSize: "15px", fontWeight: 700 }}>
+              Review Before Generating
+            </div>
+            <div
+              style={{
+                color: "rgba(255,255,255,0.7)",
+                fontSize: "11.5px",
+                marginTop: "2px",
+              }}
+            >
+              Please check everything below is correct
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            title="Close"
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              color: "white",
+              width: "30px",
+              height: "30px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "16px",
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={bodyStyle}>
+          {/* Customer */}
+          <div style={sectionTitleStyle}>Customer Details</div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Name</span>
+            <span>{formData.custName || "—"}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Phone</span>
+            <span>{formData.custPhone || "—"}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Address</span>
+            <span style={{ textAlign: "right", maxWidth: "70%" }}>
+              {formData.custAddress || "—"}
+            </span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Email</span>
+            <span>{formData.custEmail || "NA"}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>State</span>
+            <span>{formData.custState || "—"}</span>
+          </div>
+          {formData.custGstin && (
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>GSTIN</span>
+              <span>{formData.custGstin}</span>
+            </div>
+          )}
+
+          {/* Invoice details */}
+          <div style={sectionTitleStyle}>
+            {formatDocTypeLabel(formData.docType)} Details
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>
+              {formatDocTypeLabel(formData.docType)} Number
+            </span>
+            <span>{formData.invoiceNum || "—"}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Document Type</span>
+            <span>{formatDocTypeLabel(formData.docType)}</span>
+          </div>
+          {formData.docType === "TAX INVOICE" && (
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>Due Date</span>
+              <span>{dueDate || "—"}</span>
+            </div>
+          )}
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>GST Type</span>
+            <span>{gst.type === "igst" ? "IGST" : "CGST + SGST"}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Signature</span>
+            <span>
+              {noSignature ? "Blank (manual signature)" : "Digital signature"}
+            </span>
+          </div>
+          {formData.specialNotes && (
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>Special Notes</span>
+              <span style={{ textAlign: "right", maxWidth: "70%" }}>
+                {formData.specialNotes}
+              </span>
+            </div>
+          )}
+
+          {/* Items */}
+          <div style={sectionTitleStyle}>Items ({items.length})</div>
+          {items.map((item, idx) => {
+            const q = parseFloat(item.qty) || 0;
+            const p = parseFloat(item.price) || 0;
+            const lineTaxable = q * p;
+            const lineGst = (lineTaxable * gst.rate) / 100;
+            const lineAmt = lineTaxable + lineGst;
+            return (
+              <div key={item.id} style={itemCardStyle}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#1a2332",
+                    marginBottom: "4px",
+                  }}
+                >
+                  <span>
+                    {idx + 1}. {item.desc || "(no description)"}
+                  </span>
+                  <span>Rs. {lineAmt.toFixed(2)}</span>
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#5a6a7e" }}>
+                  {(item.codeType || "HSN")} Code: {item.hsn || "—"} &nbsp;•&nbsp;
+                  Qty: {q} &nbsp;•&nbsp; Price: Rs. {p.toFixed(2)} &nbsp;•&nbsp;
+                  GST: Rs. {lineGst.toFixed(2)}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Totals */}
+          <div style={sectionTitleStyle}>Totals</div>
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>Taxable Value</span>
+            <span>Rs. {taxable.toFixed(2)}</span>
+          </div>
+          {gst.type === "igst" ? (
+            <div style={rowStyle}>
+              <span style={rowLabelStyle}>IGST @ {gst.rate}%</span>
+              <span>Rs. {gstTotal.toFixed(2)}</span>
+            </div>
+          ) : (
+            <>
+              <div style={rowStyle}>
+                <span style={rowLabelStyle}>CGST @ {gst.cgst}%</span>
+                <span>Rs. {((taxable * gst.cgst) / 100).toFixed(2)}</span>
+              </div>
+              <div style={rowStyle}>
+                <span style={rowLabelStyle}>SGST @ {gst.sgst}%</span>
+                <span>Rs. {((taxable * gst.sgst) / 100).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+          <div style={rowStyle}>
+            <span style={rowLabelStyle}>
+              {appliedRoundOffs.length > 0 ? "Amount" : "Total Amount"}
+            </span>
+            <span>Rs. {total.toFixed(2)}</span>
+          </div>
+          {appliedRoundOffs.map((ro, idx) => (
+            <div key={idx} style={rowStyle}>
+              <span style={rowLabelStyle}>Round off</span>
+              <span style={{ color: "#1e8c50", fontWeight: 600 }}>
+                {ro.sign === "-" ? "− " : "+ "}Rs.{" "}
+                {parseFloat(ro.amount).toFixed(2)}
+              </span>
+            </div>
+          ))}
+          <div
+            style={{
+              ...rowStyle,
+              borderBottom: "none",
+              borderTop: "2px solid #1a2332",
+              paddingTop: "10px",
+              marginTop: "4px",
+              fontSize: "15px",
+              fontWeight: 800,
+            }}
+          >
+            <span>Final Total</span>
+            <span>
+              Rs.{" "}
+              {(appliedRoundOffs.length > 0 ? balancePayable : total).toFixed(
+                2,
+              )}
+            </span>
+          </div>
+        </div>
+
+        <div style={footerStyle}>
+          <button
+            onClick={onCancel}
+            disabled={isSubmitting}
+            style={{
+              padding: "11px 20px",
+              borderRadius: "9px",
+              border: "1.5px solid #dde3ec",
+              background: "white",
+              color: "#5a6a7e",
+              fontWeight: 600,
+              fontSize: "13px",
+              cursor: isSubmitting ? "not-allowed" : "pointer",
+              opacity: isSubmitting ? 0.6 : 1,
+            }}
+          >
+            ← Back &amp; Edit
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isSubmitting}
+            style={{
+              padding: "11px 22px",
+              borderRadius: "9px",
+              border: "none",
+              background: isSubmitting
+                ? "#8ea3bd"
+                : "linear-gradient(135deg, #1a2332, #2d4a6e)",
+              color: "white",
+              fontWeight: 700,
+              fontSize: "13px",
+              cursor: isSubmitting ? "not-allowed" : "pointer",
+              letterSpacing: "0.3px",
+            }}
+          >
+            {isSubmitting
+              ? "⏳ Saving & Generating..."
+              : "✓ Confirm & Generate PDF"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -159,22 +516,28 @@ export default function AdminTapq() {
   const [dueDate, setDueDate] = useState("");
   const [itemIdCounter, setItemIdCounter] = useState(3);
 
-  const [showAdvanceSection, setShowAdvanceSection] = useState(false);
-  const [advanceEntries, setAdvanceEntries] = useState([]);
-  const [advanceEntryCounter, setAdvanceEntryCounter] = useState(1);
+  const [showRoundOffSection, setShowRoundOffSection] = useState(false);
+  const [roundOffEntries, setRoundOffEntries] = useState([]);
+  const [roundOffEntryCounter, setRoundOffEntryCounter] = useState(1);
 
-  // ── save state ─────────────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveError, setSaveError] = useState(null);
 
-  // ── invoice number sequence state ─────────────────────────────────────
+  // NEW — controls the review/confirm popup shown before anything is
+  // actually saved or generated.
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  // NEW — "No Signature" checkbox (header). Unchecked by default. When
+  // checked, the generated PDF skips the saved signature image and leaves
+  // an empty box for a manual/wet signature instead.
+  const [noSignature, setNoSignature] = useState(false);
+
   const [nextInvoiceNumbers, setNextInvoiceNumbers] = useState(null);
   const [invoiceNumLoading, setInvoiceNumLoading] = useState(false);
 
-  // ── CUSTOMER AUTOFILL STATE ───────────────────────────────────────────
-  const [allCustomers, setAllCustomers] = useState([]);         // full list from DB
-  const [nameSuggestions, setNameSuggestions] = useState([]);   // filtered for name field
-  const [phoneSuggestions, setPhoneSuggestions] = useState([]); // filtered for phone field
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [nameSuggestions, setNameSuggestions] = useState([]);
+  const [phoneSuggestions, setPhoneSuggestions] = useState([]);
   const [showNameSuggest, setShowNameSuggest] = useState(false);
   const [showPhoneSuggest, setShowPhoneSuggest] = useState(false);
 
@@ -191,7 +554,6 @@ export default function AdminTapq() {
     setDueDate(computeDefaultDueDate());
   }, []);
 
-  // Fetch existing customers once on mount
   useEffect(() => {
     fetchExistingCustomers(API_BASE_URL).then(setAllCustomers);
   }, []);
@@ -223,21 +585,21 @@ export default function AdminTapq() {
     setGstRates({ ...INITIAL_GST_RATES });
     setDueDate(computeDefaultDueDate());
     setItemIdCounter(3);
-    setShowAdvanceSection(false);
-    setAdvanceEntries([]);
-    setAdvanceEntryCounter(1);
+    setShowRoundOffSection(false);
+    setRoundOffEntries([]);
+    setRoundOffEntryCounter(1);
     setSaveStatus("idle");
     setSaveError(null);
     setNameSuggestions([]);
     setPhoneSuggestions([]);
     setShowNameSuggest(false);
     setShowPhoneSuggest(false);
+    setNoSignature(false); // NEW — reset the checkbox back to default
     if (!skipInvoiceFetch) {
       loadAndApplyInvoiceNumbers(INITIAL_FORM_DATA.docType);
     }
   };
 
-  // ── AUTOFILL: apply a chosen customer into the form ───────────────────
   const applyCustomer = (customer) => {
     setFormData((prev) => ({
       ...prev,
@@ -246,6 +608,7 @@ export default function AdminTapq() {
       custAddress: customer.address,
       custEmail: customer.email,
       custState: customer.state,
+      custGstin: customer.gstin || "",
     }));
     setShowNameSuggest(false);
     setShowPhoneSuggest(false);
@@ -262,7 +625,12 @@ export default function AdminTapq() {
       return;
     }
 
-    if (name === "invoiceNum") return; // read-only
+    if (name === "invoiceNum") return;
+
+    if (name === "custGstin") {
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
+    }
 
     if (name === "docType") {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -275,13 +643,12 @@ export default function AdminTapq() {
       return;
     }
 
-    // ── Customer name: filter suggestions by name ─────────────────────
     if (name === "custName") {
       setFormData((prev) => ({ ...prev, [name]: value }));
       if (value.trim().length >= 1) {
         const q = value.trim().toLowerCase();
         const matches = allCustomers.filter((c) =>
-          c.name.toLowerCase().includes(q)
+          c.name.toLowerCase().includes(q),
         );
         setNameSuggestions(matches);
         setShowNameSuggest(matches.length > 0);
@@ -292,7 +659,6 @@ export default function AdminTapq() {
       return;
     }
 
-    // ── Customer phone: filter suggestions by phone ───────────────────
     if (name === "custPhone") {
       setFormData((prev) => ({ ...prev, [name]: value }));
       if (value.trim().length >= 1) {
@@ -315,11 +681,13 @@ export default function AdminTapq() {
     setGstRates((prev) => ({ ...prev, [name]: parseFloat(value) || 0 }));
   };
 
+  // ── ITEM HANDLERS ─────────────────────────────────────────────────────
+  // NEW — each item now defaults to codeType: "HSN"
   const handleAddItem = () => {
     const newId = itemIdCounter;
     setItems((prev) => [
       ...prev,
-      { id: newId, desc: "", hsn: "", qty: 1, price: "" },
+      { id: newId, desc: "", hsn: "", codeType: "HSN", qty: 1, price: "" },
     ]);
     setItemIdCounter(newId + 1);
   };
@@ -346,51 +714,59 @@ export default function AdminTapq() {
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // ── ADVANCE PAYMENT HANDLERS ──────────────────────────────────────────────
+  // ── ROUND OFF HANDLERS ─────────────────────────────────────────────────
 
-  const handleOpenAdvanceSection = () => {
-    setShowAdvanceSection(true);
-    const newId = advanceEntryCounter;
-    setAdvanceEntries([{ id: newId, advId: "", amount: "", applied: false }]);
-    setAdvanceEntryCounter(newId + 1);
+  const handleOpenRoundOffSection = () => {
+    setShowRoundOffSection(true);
+    const newId = roundOffEntryCounter;
+    setRoundOffEntries([{ id: newId, amount: "", sign: "+", applied: false }]);
+    setRoundOffEntryCounter(newId + 1);
   };
 
-  const handleCloseAdvanceSection = () => {
-    setShowAdvanceSection(false);
-    setAdvanceEntries([]);
+  const handleCloseRoundOffSection = () => {
+    setShowRoundOffSection(false);
+    setRoundOffEntries([]);
   };
 
-  const handleAdvanceEntryChange = (id, field, value) => {
-    setAdvanceEntries((prev) =>
+  const handleRoundOffEntryChange = (id, field, value) => {
+    setRoundOffEntries((prev) =>
       prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
     );
   };
 
-  const handleApplyAdvanceEntry = (id) => {
-    setAdvanceEntries((prev) =>
+  const handleToggleRoundOffSign = (id) => {
+    setRoundOffEntries((prev) =>
+      prev.map((e) =>
+        e.id === id ? { ...e, sign: e.sign === "+" ? "-" : "+" } : e,
+      ),
+    );
+  };
+
+  const handleApplyRoundOffEntry = (id) => {
+    setRoundOffEntries((prev) =>
       prev.map((e) => (e.id === id ? { ...e, applied: true } : e)),
     );
   };
 
-  const handleAddAnotherAdvance = () => {
-    const newId = advanceEntryCounter;
-    setAdvanceEntries((prev) => [
+  const handleAddAnotherRoundOff = () => {
+    const newId = roundOffEntryCounter;
+    setRoundOffEntries((prev) => [
       ...prev,
-      { id: newId, advId: "", amount: "", applied: false },
+      { id: newId, amount: "", sign: "+", applied: false },
     ]);
-    setAdvanceEntryCounter(newId + 1);
+    setRoundOffEntryCounter(newId + 1);
   };
 
-  const handleRemoveAdvanceEntry = (id) => {
-    setAdvanceEntries((prev) => {
+  const handleRemoveRoundOffEntry = (id) => {
+    setRoundOffEntries((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      if (updated.length === 0) setShowAdvanceSection(false);
+      if (updated.length === 0) setShowRoundOffSection(false);
       return updated;
     });
   };
 
-  const handleEditAdvanceEntry = (id) => {
-    setAdvanceEntries((prev) =>
+  const handleEditRoundOffEntry = (id) => {
+    setRoundOffEntries((prev) =>
       prev.map((e) => (e.id === id ? { ...e, applied: false } : e)),
     );
   };
@@ -402,13 +778,13 @@ export default function AdminTapq() {
     gstTotal,
     total,
     gst,
-    totalAdvance,
+    totalRoundOff,
     balancePayable,
-    appliedAdvances,
-  } = calculateTotals(items, formData.gstType, gstRates, advanceEntries);
+    appliedRoundOffs,
+  } = calculateTotals(items, formData.gstType, gstRates, roundOffEntries);
 
   const allApplied =
-    advanceEntries.length > 0 && advanceEntries.every((e) => e.applied);
+    roundOffEntries.length > 0 && roundOffEntries.every((e) => e.applied);
 
   const formValid = isFormValid(formData, items);
   const missingFields = getMissingFields(formData, items);
@@ -421,11 +797,13 @@ export default function AdminTapq() {
       custAddress: formData.custAddress,
       custEmail: formData.custEmail,
       custState: formData.custState,
+      custGstin: formData.custGstin,
       invoiceNum: formData.invoiceNum,
       docType: formData.docType,
       gstType: formData.gstType,
       invoiceDate: todayStr(),
       dueDate: dueDate,
+      specialNotes: formData.specialNotes,
       gstRates: {
         igstRate: gstRates.igstRate,
         cgstRate: gstRates.cgstRate,
@@ -434,17 +812,18 @@ export default function AdminTapq() {
       items: items.map((item) => ({
         desc: item.desc,
         hsn: item.hsn,
+        codeType: item.codeType || "HSN", // NEW — sent to backend
         qty: item.qty,
         price: item.price,
       })),
       taxable,
       gstTotal,
       total,
-      totalAdvance,
+      totalRoundOff,
       balancePayable,
-      appliedAdvances: appliedAdvances.map((adv) => ({
-        advId: adv.advId,
-        amount: adv.amount,
+      appliedRoundOffs: appliedRoundOffs.map((ro) => ({
+        amount: ro.amount,
+        sign: ro.sign,
       })),
     };
 
@@ -461,6 +840,12 @@ export default function AdminTapq() {
     return data;
   };
 
+  // ── ACTUAL SAVE + GENERATE (unchanged logic) ────────────────────────────
+  // This is exactly the previous handleGeneratePDF body — the only changes
+  // are: (1) WHEN this runs (only after the user reviews everything in the
+  // modal and clicks "Confirm & Generate PDF"), and (2) the `noSignature`
+  // flag is now forwarded into generatePDF() so the PDF can leave a blank
+  // signature box when the header checkbox is checked.
   const handleGeneratePDF = async () => {
     if (!formValid) return;
 
@@ -471,9 +856,9 @@ export default function AdminTapq() {
       const [qrData, sigImg, saveResult] = await Promise.all([
         generateQR(
           "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
-            (totalAdvance > 0 ? balancePayable : total).toFixed(2) +
+            (appliedRoundOffs.length > 0 ? balancePayable : total).toFixed(2) +
             "&cu=INR",
-          qrCanvasRef
+          qrCanvasRef,
         ),
         getSignatureDataURL(),
         saveDocumentToFirebase(),
@@ -486,21 +871,21 @@ export default function AdminTapq() {
         items,
         gstRates,
         dueDate,
-        totalAdvance,
+        totalRoundOff,
         balancePayable,
         total,
         taxable,
         gstTotal,
         qrData,
         sigImg,
-        appliedAdvances,
+        appliedRoundOffs,
+        noSignature, // NEW
       });
 
       setSaveStatus("saved");
       setTimeout(() => {
         setSaveStatus("idle");
         handleRefresh();
-        // Refresh customer list so the newly saved customer appears next time
         fetchExistingCustomers(API_BASE_URL).then(setAllCustomers);
       }, 4000);
     } catch (error) {
@@ -512,9 +897,11 @@ export default function AdminTapq() {
         const [qrData, sigImg] = await Promise.all([
           generateQR(
             "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
-              (totalAdvance > 0 ? balancePayable : total).toFixed(2) +
+              (appliedRoundOffs.length > 0 ? balancePayable : total).toFixed(
+                2,
+              ) +
               "&cu=INR",
-            qrCanvasRef
+            qrCanvasRef,
           ),
           getSignatureDataURL(),
         ]);
@@ -524,14 +911,15 @@ export default function AdminTapq() {
           items,
           gstRates,
           dueDate,
-          totalAdvance,
+          totalRoundOff,
           balancePayable,
           total,
           taxable,
           gstTotal,
           qrData,
           sigImg,
-          appliedAdvances,
+          appliedRoundOffs,
+          noSignature, // NEW
         });
 
         setTimeout(() => {
@@ -543,6 +931,22 @@ export default function AdminTapq() {
         console.error("PDF generation also failed:", pdfError);
       }
     }
+  };
+
+  // NEW — clicking the main button no longer generates anything directly.
+  // It just opens the review popup (only if the form is actually valid).
+  const handleOpenReview = () => {
+    if (!formValid) return;
+    setShowReviewModal(true);
+  };
+
+  // NEW — called from inside the review modal's "Confirm & Generate PDF"
+  // button. Keeps the modal open (showing a saving state) until the save +
+  // PDF flow finishes, then closes it — mirroring the existing saveStatus
+  // lifecycle so nothing else about that flow changes.
+  const handleConfirmFromReview = async () => {
+    await handleGeneratePDF();
+    setShowReviewModal(false);
   };
 
   // ── BUTTON LABEL & STYLE HELPERS ──────────────────────────────────────────
@@ -572,6 +976,30 @@ export default function AdminTapq() {
           <p>Create TAPQ docs</p>
         </div>
         <div className="tapq-header-actions">
+          {/* NEW — "No Signature" checkbox. Unchecked by default. When
+              checked, the generated PDF leaves an empty box instead of the
+              saved signature image, for manual/wet signing. */}
+          <label
+            className="tapq-nosign-toggle"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              color: "white",
+              fontSize: "13px",
+              cursor: "pointer",
+              userSelect: "none",
+              whiteSpace: "nowrap",
+            }}
+            title="If checked, the PDF will leave a blank space for a manual signature instead of using the saved signature image"
+          >
+            <input
+              type="checkbox"
+              checked={noSignature}
+              onChange={(e) => setNoSignature(e.target.checked)}
+            />
+            No Signature
+          </label>
           <button
             className="tapq-btn-view-docs"
             onClick={() => navigate("/tapqdocs")}
@@ -594,8 +1022,6 @@ export default function AdminTapq() {
         <div className="tapq-card">
           <h2>Customer Details</h2>
           <div className="tapq-form-grid">
-
-            {/* Customer Name with autofill dropdown */}
             <div className="tapq-form-group tapq-suggest-wrapper">
               <label>Customer Name *</label>
               <input
@@ -618,7 +1044,6 @@ export default function AdminTapq() {
               )}
             </div>
 
-            {/* Customer Phone with autofill dropdown */}
             <div className="tapq-form-group tapq-suggest-wrapper">
               <label>Phone *</label>
               <input
@@ -676,6 +1101,20 @@ export default function AdminTapq() {
                 ))}
               </select>
             </div>
+
+            <div className="tapq-form-group">
+              <label>GSTIN (optional)</label>
+              <input
+                type="text"
+                name="custGstin"
+                value={formData.custGstin}
+                onChange={handleFormChange}
+                placeholder="e.g. 29ABCDE1234F1Z5"
+                maxLength={15}
+                style={{ textTransform: "uppercase" }}
+                autoComplete="off"
+              />
+            </div>
           </div>
         </div>
 
@@ -687,7 +1126,9 @@ export default function AdminTapq() {
               <label>
                 {formatDocTypeLabel(formData.docType)} Number *{" "}
                 {invoiceNumLoading && (
-                  <span className="tapq-inv-loading-hint">(fetching next #...)</span>
+                  <span className="tapq-inv-loading-hint">
+                    (fetching next #...)
+                  </span>
                 )}
               </label>
               <input
@@ -735,6 +1176,30 @@ export default function AdminTapq() {
               </select>
             </div>
           </div>
+
+          <div
+            className="tapq-form-group tapq-span2"
+            style={{ marginTop: "12px" }}
+          >
+            <label>Special Notes (optional)</label>
+            <textarea
+              name="specialNotes"
+              value={formData.specialNotes}
+              onChange={handleFormChange}
+              placeholder="Any additional notes to include on the document..."
+              rows={3}
+              style={{
+                width: "100%",
+                resize: "vertical",
+                fontFamily: "inherit",
+                padding: "8px 10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
           <div className="tapq-notice">
             Invoice Date is automatically set to <strong>today</strong>. Due
             Date is automatically set to <strong>15 days from today</strong>.
@@ -749,7 +1214,7 @@ export default function AdminTapq() {
           <div className="tapq-items-header">
             <span>Si.No</span>
             <span>Item</span>
-            <span>HSN Code</span>
+            <span>HSN/SAC</span>
             <span>Qty</span>
             <span>Price/Unit</span>
             <span>GST Amt</span>
@@ -774,14 +1239,33 @@ export default function AdminTapq() {
                       handleItemChange(item.id, "desc", e.target.value)
                     }
                   />
-                  <input
-                    type="text"
-                    placeholder="HSN"
-                    value={item.hsn}
-                    onChange={(e) =>
-                      handleItemChange(item.id, "hsn", e.target.value)
-                    }
-                  />
+
+                  <div className="tapq-item-code-group">
+                    <select
+                      className="tapq-item-code-select"
+                      value={item.codeType || "HSN"}
+                      onChange={(e) =>
+                        handleItemChange(item.id, "codeType", e.target.value)
+                      }
+                    >
+                      <option value="HSN">HSN</option>
+                      <option value="SAC">SAC</option>
+                    </select>
+                    <input
+                      type="text"
+                      className="tapq-item-code-input"
+                      placeholder={
+                        (item.codeType || "HSN") === "SAC"
+                          ? "SAC code"
+                          : "HSN code"
+                      }
+                      value={item.hsn}
+                      onChange={(e) =>
+                        handleItemChange(item.id, "hsn", e.target.value)
+                      }
+                    />
+                  </div>
+
                   <NumInput
                     placeholder="Qty"
                     value={item.qty}
@@ -854,31 +1338,29 @@ export default function AdminTapq() {
             </div>
           )}
 
-          {/* Totals + Advance Payment */}
           <div className="tapq-totals-bottom">
-            {/* LEFT: Advance Payment Section */}
             <div className="tapq-advance-section">
-              {!showAdvanceSection ? (
+              {!showRoundOffSection ? (
                 <button
                   className="tapq-btn-advance"
-                  onClick={handleOpenAdvanceSection}
+                  onClick={handleOpenRoundOffSection}
                 >
-                  + Add Advance Payment
+                  + Add Round Off
                 </button>
               ) : (
                 <div className="tapq-advance-box">
                   <div className="tapq-advance-header">
-                    <span className="tapq-advance-label">Advance Payments</span>
+                    <span className="tapq-advance-label">Round Off</span>
                     <button
                       className="tapq-advance-close"
-                      onClick={handleCloseAdvanceSection}
+                      onClick={handleCloseRoundOffSection}
                     >
                       ×
                     </button>
                   </div>
 
                   <div className="tapq-advance-entries">
-                    {advanceEntries.map((entry, idx) => (
+                    {roundOffEntries.map((entry, idx) => (
                       <div
                         key={entry.id}
                         className={`tapq-advance-entry ${entry.applied ? "tapq-advance-entry--applied" : ""}`}
@@ -887,9 +1369,9 @@ export default function AdminTapq() {
                           <span className="tapq-advance-entry-num">
                             #{idx + 1}
                           </span>
-                          {entry.applied && entry.advId && (
+                          {entry.applied && (
                             <span className="tapq-advance-entry-id-badge">
-                              {entry.advId}
+                              Round off
                             </span>
                           )}
                         </div>
@@ -898,18 +1380,19 @@ export default function AdminTapq() {
                           <div className="tapq-advance-applied-row">
                             <div className="tapq-advance-applied-info">
                               <span className="tapq-advance-applied-id">
-                                {entry.advId || (
-                                  <em style={{ opacity: 0.5 }}>No ID</em>
-                                )}
+                                Round off
                               </span>
                               <span className="tapq-advance-applied-amt">
-                                Rs. {parseFloat(entry.amount || 0).toFixed(2)}
+                                {entry.sign === "-" ? "− " : "+ "}Rs.{" "}
+                                {parseFloat(entry.amount || 0).toFixed(2)}
                               </span>
                             </div>
                             <div className="tapq-advance-applied-actions">
                               <button
                                 className="tapq-btn-edit-adv"
-                                onClick={() => handleEditAdvanceEntry(entry.id)}
+                                onClick={() =>
+                                  handleEditRoundOffEntry(entry.id)
+                                }
                                 title="Edit"
                               >
                                 ✎
@@ -917,7 +1400,7 @@ export default function AdminTapq() {
                               <button
                                 className="tapq-btn-remove-adv"
                                 onClick={() =>
-                                  handleRemoveAdvanceEntry(entry.id)
+                                  handleRemoveRoundOffEntry(entry.id)
                                 }
                                 title="Remove"
                               >
@@ -929,21 +1412,25 @@ export default function AdminTapq() {
                           <div className="tapq-advance-input-group">
                             <div className="tapq-advance-id-wrapper">
                               <span className="tapq-advance-id-icon">🔖</span>
-                              <input
-                                type="text"
-                                className="tapq-advance-id-input"
-                                placeholder="Payment ID (e.g. TXN123)"
-                                value={entry.advId}
-                                onChange={(e) =>
-                                  handleAdvanceEntryChange(
-                                    entry.id,
-                                    "advId",
-                                    e.target.value,
-                                  )
-                                }
-                              />
+                              <span className="tapq-advance-fixed-label">
+                                Round off
+                              </span>
                             </div>
                             <div className="tapq-advance-input-row">
+                              <button
+                                type="button"
+                                className="tapq-btn-sign-toggle"
+                                onClick={() =>
+                                  handleToggleRoundOffSign(entry.id)
+                                }
+                                title={
+                                  entry.sign === "-"
+                                    ? "Switch to add (+)"
+                                    : "Switch to subtract (−)"
+                                }
+                              >
+                                {entry.sign === "-" ? "−" : "+"}
+                              </button>
                               <span className="tapq-advance-prefix">Rs.</span>
                               <input
                                 type="number"
@@ -961,7 +1448,7 @@ export default function AdminTapq() {
                                     e.preventDefault();
                                 }}
                                 onChange={(e) =>
-                                  handleAdvanceEntryChange(
+                                  handleRoundOffEntryChange(
                                     entry.id,
                                     "amount",
                                     e.target.value,
@@ -976,16 +1463,16 @@ export default function AdminTapq() {
                                   !entry.amount || parseFloat(entry.amount) <= 0
                                 }
                                 onClick={() =>
-                                  handleApplyAdvanceEntry(entry.id)
+                                  handleApplyRoundOffEntry(entry.id)
                                 }
                               >
                                 ✓ Apply
                               </button>
-                              {advanceEntries.length > 1 && (
+                              {roundOffEntries.length > 1 && (
                                 <button
                                   className="tapq-btn-remove-adv"
                                   onClick={() =>
-                                    handleRemoveAdvanceEntry(entry.id)
+                                    handleRemoveRoundOffEntry(entry.id)
                                   }
                                 >
                                   ×
@@ -1001,23 +1488,25 @@ export default function AdminTapq() {
                   {allApplied && (
                     <button
                       className="tapq-btn-add-another-adv"
-                      onClick={handleAddAnotherAdvance}
+                      onClick={handleAddAnotherRoundOff}
                     >
-                      + Add Another Payment
+                      + Add Another Round Off
                     </button>
                   )}
 
-                  {appliedAdvances.length > 1 && (
+                  {appliedRoundOffs.length > 1 && (
                     <div className="tapq-advance-summary">
-                      <span>Total Advance</span>
-                      <strong>Rs. {totalAdvance.toFixed(2)}</strong>
+                      <span>Total Round Off</span>
+                      <strong>
+                        {totalRoundOff < 0 ? "− " : "+ "}Rs.{" "}
+                        {Math.abs(totalRoundOff).toFixed(2)}
+                      </strong>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* RIGHT: Totals */}
             <div className="tapq-totals-grid">
               <div className="tapq-total-row">
                 <span>Taxable Value</span>
@@ -1041,31 +1530,35 @@ export default function AdminTapq() {
                 </>
               )}
               <div className="tapq-total-row tapq-grand">
-                <span>Total Amount</span>
+                <span>
+                  {appliedRoundOffs.length > 0 ? "Amount" : "Total Amount"}
+                </span>
                 <span>Rs. {total.toFixed(2)}</span>
               </div>
 
-              {appliedAdvances.map((adv, idx) => (
-                <div key={adv.id} className="tapq-total-row tapq-advance-row">
+              {appliedRoundOffs.map((ro, idx) => (
+                <div key={ro.id} className="tapq-total-row tapq-advance-row">
+                  <span>Round off</span>
                   <span>
-                    {adv.advId
-                      ? `Advance #${idx + 1} (${adv.advId})`
-                      : `Advance #${idx + 1}`}
+                    {ro.sign === "-" ? "− " : "+ "}Rs.{" "}
+                    {parseFloat(ro.amount).toFixed(2)}
                   </span>
-                  <span>− Rs. {parseFloat(adv.amount).toFixed(2)}</span>
                 </div>
               ))}
 
-              {appliedAdvances.length > 1 && (
+              {appliedRoundOffs.length > 1 && (
                 <div className="tapq-total-row tapq-advance-row tapq-advance-total-row">
-                  <span>Total Advance</span>
-                  <span>− Rs. {totalAdvance.toFixed(2)}</span>
+                  <span>Total Round Off</span>
+                  <span>
+                    {totalRoundOff < 0 ? "− " : "+ "}Rs.{" "}
+                    {Math.abs(totalRoundOff).toFixed(2)}
+                  </span>
                 </div>
               )}
 
-              {appliedAdvances.length > 0 && (
+              {appliedRoundOffs.length > 0 && (
                 <div className="tapq-total-row tapq-balance-row">
-                  <span>Balance Payable</span>
+                  <span>Total Amount</span>
                   <span>Rs. {balancePayable.toFixed(2)}</span>
                 </div>
               )}
@@ -1077,12 +1570,12 @@ export default function AdminTapq() {
         <div className="tapq-generate-wrapper">
           <button
             className={getButtonClass()}
-            onClick={handleGeneratePDF}
+            onClick={handleOpenReview}
             disabled={!formValid || saveStatus === "saving"}
             title={
               !formValid
                 ? "Fill all required fields to generate PDF"
-                : "Generate Invoice PDF"
+                : "Review before generating PDF"
             }
           >
             {getButtonLabel()}
@@ -1102,6 +1595,29 @@ export default function AdminTapq() {
           )}
         </div>
       </div>
+
+      {/* NEW — Review & Confirm popup. Rendered on top of everything else;
+          nothing is saved/generated until the user confirms inside it. */}
+      {showReviewModal && (
+        <ReviewModal
+          formData={formData}
+          items={items}
+          gst={gst}
+          taxable={taxable}
+          gstTotal={gstTotal}
+          total={total}
+          totalRoundOff={totalRoundOff}
+          balancePayable={balancePayable}
+          appliedRoundOffs={appliedRoundOffs}
+          dueDate={dueDate}
+          noSignature={noSignature}
+          isSubmitting={saveStatus === "saving"}
+          onCancel={() => {
+            if (saveStatus !== "saving") setShowReviewModal(false);
+          }}
+          onConfirm={handleConfirmFromReview}
+        />
+      )}
 
       <div
         id="tapq-qr-hidden"

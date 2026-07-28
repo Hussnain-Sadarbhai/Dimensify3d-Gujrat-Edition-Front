@@ -207,9 +207,15 @@ export default function TapqDocs() {
         sgstRate: doc.gstRates?.sgstRate ?? 9,
       };
 
+      // codeType is what tells the PDF header whether to print "HSN Code",
+      // "SAC Code", or "HSN/SAC Code" (see getCodeColumnLabel in
+      // AdminTapqPdf.js). This field was previously dropped here, so every
+      // regenerated PDF fell back to the "HSN" default no matter what the
+      // item was originally saved as — that's what's fixed below.
       const items = (doc.items || []).map((item) => ({
         desc: item.desc || "",
         hsn: item.hsn || "",
+        codeType: item.codeType || "HSN",
         qty: item.qty || 0,
         price: item.price || 0,
       }));

@@ -118,7 +118,7 @@
 /* Items Header */
 .tapq-items-header {
   display: grid;
-  grid-template-columns: 28px 1.9fr 70px 50px 80px 80px 90px 38px;
+  grid-template-columns: 28px 1.9fr 100px 50px 80px 80px 90px 38px;
   gap: 6px;
   padding: 7px 10px;
   background: #f0f4f8;
@@ -139,7 +139,7 @@
 /* Item Row */
 .tapq-item-row {
   display: grid;
-  grid-template-columns: 28px 1.9fr 70px 50px 80px 80px 90px 38px;
+  grid-template-columns: 28px 1.9fr 100px 50px 80px 80px 90px 38px;
   gap: 6px;
   padding: 6px 0;
   align-items: center;
@@ -172,6 +172,68 @@
   color: #5a6a7e;
   text-align: right;
   padding: 7px 4px;
+}
+
+/* ── HSN / SAC code group (dropdown + code input, stacked) ─────────────────
+   This pair sits inside its own grid cell in .tapq-item-row. The dropdown
+   picks HSN or SAC, the input below it holds the actual code. Both are kept
+   compact and visually tied together so they read as a single control. */
+.tapq-item-code-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0; /* allow shrinking inside the grid cell without overflow */
+}
+
+.tapq-item-code-select {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 6px;
+  border: 1.5px solid #dde3ec;
+  border-radius: 6px;
+  background: #f0f4f8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%235a6a7e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 8px center;
+  background-size: 9px 5px;
+  color: #2d5faa;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color 0.2s, background-color 0.2s;
+  box-sizing: border-box;
+}
+
+.tapq-item-code-select:hover {
+  border-color: #b8c8e0;
+}
+
+.tapq-item-code-select:focus {
+  border-color: #3a7bd5;
+  background-color: white;
+}
+
+.tapq-item-code-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1.5px solid #dde3ec;
+  border-radius: 6px;
+  outline: none;
+  background: #fafbfc;
+  color: #1a2332;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.tapq-item-code-input:focus {
+  border-color: #3a7bd5;
+  background: white;
+}
+
+.tapq-item-code-input::placeholder {
+  color: #b8c3d0;
+  font-size: 11px;
 }
 
 /* Buttons */
@@ -467,7 +529,7 @@
 
   .tapq-items-header,
   .tapq-item-row {
-    grid-template-columns: 25px 1fr 40px 40px 50px 50px 50px 25px;
+    grid-template-columns: 25px 1fr 62px 40px 50px 50px 50px 25px;
     gap: 4px;
     font-size: 9px;
   }
@@ -475,6 +537,17 @@
   .tapq-item-row input {
     font-size: 11px;
     padding: 5px 7px;
+  }
+
+  .tapq-item-code-select {
+    font-size: 9.5px;
+    padding: 4px 14px 4px 4px;
+    background-position: right 5px center;
+  }
+
+  .tapq-item-code-input {
+    font-size: 10.5px;
+    padding: 4px 5px;
   }
 
   .tapq-gst-row {
