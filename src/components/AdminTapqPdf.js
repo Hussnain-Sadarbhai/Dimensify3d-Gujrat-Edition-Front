@@ -614,6 +614,8 @@ export const generatePDF = async (params) => {
   sf("bold", brandNameSize, C.darkBlue);
   tx("DIMENSIFY3D", brandTextX, brandNameBaselineY);
 
+  // NOTE: intentionally left as light grey per request — this is the only
+  // grey text kept in the whole document.
   sf("normal", taglineSize, C.grey);
   tx("3D Printing Services", brandTextX, taglineBaselineY);
 
@@ -629,7 +631,7 @@ export const generatePDF = async (params) => {
   y += 18;
 
   // ── ═══════════════════════════════════════════════════════════════════
-  //    REST OF DOCUMENT (unchanged from original)
+  //    REST OF DOCUMENT
   // ── ═══════════════════════════════════════════════════════════════════
 
   const c1 = ML,
@@ -660,12 +662,14 @@ export const generatePDF = async (params) => {
     showDueDate = false;
   }
 
-  sf("bold", 7.5, C.grey);
+  // FIXED — was C.grey (too light to print well), now C.darkBlue
+  sf("bold", 7.5, C.darkBlue);
   tx(detailsHeading, c1, y);
   y += 12;
 
   const infoRow = (lbl, val, xx, yy) => {
-    sf("normal", 7.5, C.grey);
+    // FIXED — was C.grey, now C.darkBlue so it prints crisp
+    sf("normal", 7.5, C.darkBlue);
     doc.text(lbl, xx, yy);
     doc.text(":", xx + 55, yy);
     sf("bold", 7.5, C.darkBlue);
@@ -685,7 +689,8 @@ export const generatePDF = async (params) => {
   infoRow("GSTIN", "29FCLPB9057E1ZB", c1, y);
 
   let by = secTopY;
-  sf("bold", 7.5, C.grey);
+  // FIXED — was C.grey, now C.darkBlue
+  sf("bold", 7.5, C.darkBlue);
   tx("BILLED BY", c2, by);
   by += 12;
   sf("bold", 8.5, C.darkBlue);
@@ -712,7 +717,8 @@ export const generatePDF = async (params) => {
     billToLabel = "PAYMENT FROM";
   }
 
-  sf("bold", 7.5, C.grey);
+  // FIXED — was C.grey, now C.darkBlue
+  sf("bold", 7.5, C.darkBlue);
   tx(billToLabel, c3, bt);
   bt += 12;
   sf("bold", 8.5, C.darkBlue);
@@ -860,7 +866,8 @@ export const generatePDF = async (params) => {
   // "y += 8" spacing, i.e. unchanged from before.
   if (specialNotes) {
     y += 12;
-    sf("bold", 8, C.grey);
+    // FIXED — was C.grey, now C.darkBlue
+    sf("bold", 8, C.darkBlue);
     tx("SPECIAL NOTES:", ML, y);
     y += 9;
     sf("normal", 8, C.darkBlue);
@@ -885,9 +892,10 @@ export const generatePDF = async (params) => {
   y += 44;
   ln(sigX, y, W - MR, y, C.grey, 0.5);
   y += 8;
-  sf("bold", 7.5, C.grey);
+  // FIXED — was C.grey, now C.darkBlue for both lines
+  sf("bold", 7.5, C.darkBlue);
   tx("Authorised Signatory", sigX + 70, y, { align: "center" });
-  sf("normal", 7, C.grey);
+  sf("normal", 7, C.darkBlue);
   tx("Rexora - Dimensify3D", sigX + 70, y + 9, { align: "center" });
 
   y += 22;
@@ -896,7 +904,8 @@ export const generatePDF = async (params) => {
 
   const fullW = W - ML - MR;
 
-  sf("bold", 9, C.grey);
+  // FIXED — was C.grey, now C.darkBlue
+  sf("bold", 9, C.darkBlue);
   tx("BANK ACCOUNT DETAILS", ML, y);
   y += 11;
 
@@ -904,7 +913,8 @@ export const generatePDF = async (params) => {
   const bCol2 = ML + fullW * 0.5;
 
   const bRow = (lbl, val, col, yy) => {
-    sf("normal", 8.5, C.grey);
+    // FIXED — was C.grey, now C.darkBlue
+    sf("normal", 8.5, C.darkBlue);
     doc.text(lbl, col, yy);
     sf("bold", 9, C.darkBlue);
     doc.text(val, col + 112, yy);
@@ -920,9 +930,10 @@ export const generatePDF = async (params) => {
   const qrStartY = y;
   if (qrData) {
     doc.addImage(qrData, "PNG", bCol1, y, 62, 62);
-    sf("bold", 8, C.grey);
+    // FIXED — was C.grey, now C.darkBlue
+    sf("bold", 8, C.darkBlue);
     tx("Scan to pay via UPI", bCol1 + 68, y + 10);
-    sf("normal", 7.5, C.grey);
+    sf("normal", 7.5, C.darkBlue);
     tx("9483914542@kotak811", bCol1 + 68, y + 22);
     tx("Max Rs.1 lakh per UPI transaction per day.", bCol1 + 68, y + 32);
     y = qrStartY + 68;
@@ -930,13 +941,14 @@ export const generatePDF = async (params) => {
 
   y += 8;
   const metaY = y;
-  sf("bold", 8.5, C.grey);
+  // FIXED — all four column headings were C.grey, now C.darkBlue
+  sf("bold", 8.5, C.darkBlue);
   tx("PAN CARD", bCol1, metaY);
-  sf("bold", 8.5, C.grey);
+  sf("bold", 8.5, C.darkBlue);
   tx("MODE/TERM OF PAYMENT", bCol1 + 90, metaY);
-  sf("bold", 8.5, C.grey);
+  sf("bold", 8.5, C.darkBlue);
   tx("DISPATCHED THROUGH", bCol1 + 260, metaY);
-  sf("bold", 8.5, C.grey);
+  sf("bold", 8.5, C.darkBlue);
   tx("DESTINATION", bCol1 + 370, metaY);
   y += 10;
   sf("bold", 9, C.darkBlue);
@@ -955,7 +967,8 @@ export const generatePDF = async (params) => {
   tx("At Work Place", bCol1 + 370, y);
   y += 14;
 
-  sf("bold", 8.5, C.grey);
+  // FIXED — was C.grey, now C.darkBlue
+  sf("bold", 8.5, C.darkBlue);
   tx("TERMS OF DELIVERY", bCol1, y);
   y += 10;
   sf("normal", 8.5, C.darkBlue);
@@ -965,7 +978,8 @@ export const generatePDF = async (params) => {
   ln(ML, y, W - MR, y, C.lightGrey, 0.5);
   y += 10;
 
-  sf("bold", 9, C.grey);
+  // FIXED — was C.grey, now C.darkBlue
+  sf("bold", 9, C.darkBlue);
   tx("TERMS AND CONDITIONS", ML, y);
   y += 12;
 

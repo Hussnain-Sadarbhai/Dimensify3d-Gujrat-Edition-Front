@@ -8,6 +8,8 @@ import {
   generateQR,
   getSignatureDataURL,
   generatePDF,
+  GST_STATES,
+  isFormValid,
 } from "./AdminTapqPdf";
 import API_BASE_URL from "./apiConfig";
 
@@ -60,6 +62,465 @@ function formatTimestamp(ms) {
   );
 }
 
+// ── EDIT DOCUMENT MODAL ─────────────────────────────────────────────────────
+// Opened via the "✎ Edit" button on a row. Lets the user change customer
+// details, items, GST rates, round-offs, due date, and special notes for an
+// already-saved document, then on save: (1) PUTs the changes to the backend
+// so the database record is updated, and (2) regenerates + downloads the PDF
+// with the edited values using the same generatePDF() renderer used
+// everywhere else. Document Type is intentionally locked (not editable) —
+// changing it would mean moving the record between Firebase subcollections,
+// which the update-document endpoint does not support.
+function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
+  const cfg = doc.__cfg;
+
+  const [formData, setFormData] = useState({
+    custName: doc.customer?.name || "",
+    custPhone: doc.customer?.phone || "",
+    custAddress: doc.customer?.address || "",
+    custEmail: doc.customer?.email || "",
+    custState: doc.customer?.state || "Karnataka, Code : 29",
+    custGstin: doc.customer?.gstin || "",
+    invoiceNum: doc.document?.invoiceNum || "",
+    docType: cfg ? cfg.docType : doc.document?.docType || "TAX INVOICE",
+    gstType: doc.document?.gstType || "igst",
+    specialNotes: doc.document?.specialNotes || "",
+  });
+
+  const [dueDate, setDueDate] = useState(doc.document?.dueDate || "");
+
+  const [gstRates, setGstRates] = useState({
+    igstRate: doc.gstRates?.igstRate ?? 18,
+    cgstRate: doc.gstRates?.cgstRate ?? 9,
+    sgstRate: doc.gstRates?.sgstRate ?? 9,
+  });
+
+  const [items, setItems] = useState(
+    (doc.items || []).map((it, idx) => ({
+      id: idx,
+      desc: it.desc || "",
+      hsn: it.hsn || "",
+      codeType: it.codeType || "HSN",
+      qty: it.qty ?? 1,
+      price: it.price ?? "",
+    })),
+  );
+  const [itemIdCounter, setItemIdCounter] = useState(items.length);
+
+  // Existing saved documents may have round-off data stored under the old
+  // `appliedAdvances` name or the newer `appliedRoundOffs` name — read
+  // whichever is present so older records still load correctly here.
+  const savedRoundOffs = doc.appliedRoundOffs || doc.appliedAdvances || [];
+  const [roundOffs, setRoundOffs] = useState(
+    savedRoundOffs.map((ro, idx) => ({
+      id: idx,
+      amount: ro.amount ?? "",
+      sign: ro.sign === "-" ? "-" : "+",
+    })),
+  );
+  const [roundOffCounter, setRoundOffCounter] = useState(roundOffs.length);
+
+  const [noSignature, setNoSignature] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "custAddress") {
+      setFormData((p) => ({ ...p, custAddress: value.replace(/[\r\n]+/g, " ") }));
+      return;
+    }
+    if (name === "custGstin") {
+      setFormData((p) => ({ ...p, custGstin: value.toUpperCase() }));
+      return;
+    }
+    setFormData((p) => ({ ...p, [name]: value }));
+  };
+
+  const handleItemChange = (id, field, value) => {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === id
+          ? {
+              ...it,
+              [field]:
+                field === "qty" || field === "price"
+                  ? value === ""
+                    ? ""
+                    : parseFloat(value) || 0
+                  : value,
+            }
+          : it,
+      ),
+    );
+  };
+
+  const handleAddItem = () => {
+    setItems((prev) => [
+      ...prev,
+      { id: itemIdCounter, desc: "", hsn: "", codeType: "HSN", qty: 1, price: "" },
+    ]);
+    setItemIdCounter((c) => c + 1);
+  };
+
+  const handleRemoveItem = (id) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  };
+
+  const handleAddRoundOff = () => {
+    setRoundOffs((prev) => [...prev, { id: roundOffCounter, amount: "", sign: "+" }]);
+    setRoundOffCounter((c) => c + 1);
+  };
+
+  const handleRoundOffChange = (id, field, value) => {
+    setRoundOffs((prev) => prev.map((ro) => (ro.id === id ? { ...ro, [field]: value } : ro)));
+  };
+
+  const handleToggleRoundOffSign = (id) => {
+    setRoundOffs((prev) =>
+      prev.map((ro) => (ro.id === id ? { ...ro, sign: ro.sign === "-" ? "+" : "-" } : ro)),
+    );
+  };
+
+  const handleRemoveRoundOff = (id) => {
+    setRoundOffs((prev) => prev.filter((ro) => ro.id !== id));
+  };
+
+  // calculateTotals only counts entries whose `applied` flag is true — every
+  // row in this modal is meant to apply directly, so mark them all applied
+  // at calculation time rather than requiring a separate "Apply" step.
+  const roundOffEntriesForCalc = roundOffs
+    .filter((ro) => ro.amount !== "" && parseFloat(ro.amount) > 0)
+    .map((ro) => ({ ...ro, applied: true }));
+
+  const { taxable, gstTotal, total, gst, totalRoundOff, balancePayable, appliedRoundOffs } =
+    calculateTotals(items, formData.gstType, gstRates, roundOffEntriesForCalc);
+
+  const formValid = isFormValid(formData, items);
+
+  const handleSave = async () => {
+    if (!formValid) {
+      setError(
+        "Please fill in all required fields (name, phone, address, doc number, and valid items).",
+      );
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const payload = {
+        custName: formData.custName,
+        custPhone: formData.custPhone,
+        custAddress: formData.custAddress,
+        custEmail: formData.custEmail,
+        custState: formData.custState,
+        custGstin: formData.custGstin,
+        invoiceNum: formData.invoiceNum,
+        docType: formData.docType, // locked, sent unchanged
+        gstType: formData.gstType,
+        dueDate,
+        specialNotes: formData.specialNotes,
+        gstRates,
+        items: items.map((it) => ({
+          desc: it.desc,
+          hsn: it.hsn,
+          codeType: it.codeType || "HSN",
+          qty: it.qty,
+          price: it.price,
+        })),
+        taxable,
+        gstTotal,
+        total,
+        totalRoundOff,
+        balancePayable,
+        appliedRoundOffs: appliedRoundOffs.map((ro) => ({
+          amount: ro.amount,
+          sign: ro.sign,
+        })),
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/tapq/update-document/${doc.documentId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update document");
+      }
+
+      // Regenerate the PDF with the edited values, using the same renderer
+      // as document creation / regeneration.
+      const amountForQR = totalRoundOff !== 0 ? balancePayable : total;
+      const [qrData, sigImg] = await Promise.all([
+        generateQR(
+          "upi://pay?pa=9483914542@kotak811&pn=MohammedAdilBetageri&am=" +
+            amountForQR.toFixed(2) +
+            "&cu=INR",
+          qrCanvasRef,
+        ),
+        getSignatureDataURL(),
+      ]);
+
+      await generatePDF({
+        formData,
+        items,
+        gstRates,
+        dueDate,
+        totalRoundOff,
+        balancePayable,
+        total,
+        taxable,
+        gstTotal,
+        qrData,
+        sigImg,
+        appliedRoundOffs,
+        noSignature,
+      });
+
+      onSaved({
+        ...doc,
+        customer: {
+          name: formData.custName,
+          phone: formData.custPhone,
+          address: formData.custAddress,
+          email: formData.custEmail,
+          state: formData.custState,
+          gstin: formData.custGstin,
+        },
+        document: {
+          ...doc.document,
+          invoiceNum: formData.invoiceNum,
+          gstType: formData.gstType,
+          dueDate,
+          specialNotes: formData.specialNotes,
+        },
+        gstRates,
+        items: payload.items,
+        totals: { taxable, gstTotal, total, totalRoundOff, balancePayable },
+        appliedRoundOffs: payload.appliedRoundOffs,
+      });
+    } catch (err) {
+      console.error("Failed to save edited document:", err);
+      setError(err.message || "Something went wrong while saving");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="tapqdocs-modal-overlay"
+      onMouseDown={() => !isSaving && onCancel()}
+    >
+      <div className="tapqdocs-modal-box" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="tapqdocs-modal-header">
+          <div>
+            <div className="tapqdocs-modal-title">
+              Edit {cfg ? cfg.label.replace(/s$/, "") : "Document"}
+            </div>
+            <div className="tapqdocs-modal-subtitle">
+              Changes save to the database and regenerate the PDF
+            </div>
+          </div>
+          <button
+            className="tapqdocs-modal-close-btn"
+            onClick={onCancel}
+            disabled={isSaving}
+            title="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="tapqdocs-modal-body">
+          {error && <div className="tapqdocs-modal-error">⚠ {error}</div>}
+
+          <div className="tapqdocs-modal-section-title">Customer Details</div>
+          <div className="tapqdocs-modal-grid">
+            <input
+              name="custName"
+              value={formData.custName}
+              onChange={handleFormChange}
+              placeholder="Customer Name *"
+            />
+            <input
+              name="custPhone"
+              value={formData.custPhone}
+              onChange={handleFormChange}
+              placeholder="Phone *"
+            />
+            <input
+              name="custAddress"
+              value={formData.custAddress}
+              onChange={handleFormChange}
+              placeholder="Address *"
+              className="tapqdocs-modal-span2"
+            />
+            <input
+              name="custEmail"
+              value={formData.custEmail}
+              onChange={handleFormChange}
+              placeholder="Email"
+            />
+            <select name="custState" value={formData.custState} onChange={handleFormChange}>
+              {GST_STATES.map(([name, code]) => (
+                <option key={code} value={`${name}, Code : ${code}`}>
+                  {name} (Code : {code})
+                </option>
+              ))}
+            </select>
+            <input
+              name="custGstin"
+              value={formData.custGstin}
+              onChange={handleFormChange}
+              placeholder="GSTIN (optional)"
+              className="tapqdocs-modal-uppercase"
+            />
+          </div>
+
+          <div className="tapqdocs-modal-section-title">
+            {cfg ? cfg.label.replace(/s$/, "") : "Document"} Details
+          </div>
+          <div className="tapqdocs-modal-grid">
+            <input
+              name="invoiceNum"
+              value={formData.invoiceNum}
+              onChange={handleFormChange}
+              placeholder="Doc Number *"
+            />
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <select name="gstType" value={formData.gstType} onChange={handleFormChange}>
+              <option value="igst">IGST</option>
+              <option value="cgst_sgst">CGST + SGST</option>
+            </select>
+            <div className="tapqdocs-modal-locked-type">
+              Document Type: <strong>{formData.docType}</strong> (locked)
+            </div>
+            <textarea
+              name="specialNotes"
+              value={formData.specialNotes}
+              onChange={handleFormChange}
+              placeholder="Special notes (optional)"
+              rows={2}
+              className="tapqdocs-modal-span2 tapqdocs-modal-textarea"
+            />
+          </div>
+
+          <div className="tapqdocs-modal-section-title">Items</div>
+          {items.map((item) => (
+            <div key={item.id} className="tapqdocs-modal-item-row">
+              <input
+                className="tapqdocs-modal-item-desc"
+                placeholder="Description"
+                value={item.desc}
+                onChange={(e) => handleItemChange(item.id, "desc", e.target.value)}
+              />
+              <select
+                value={item.codeType || "HSN"}
+                onChange={(e) => handleItemChange(item.id, "codeType", e.target.value)}
+              >
+                <option value="HSN">HSN</option>
+                <option value="SAC">SAC</option>
+              </select>
+              <input
+                className="tapqdocs-modal-item-code"
+                placeholder="Code"
+                value={item.hsn}
+                onChange={(e) => handleItemChange(item.id, "hsn", e.target.value)}
+              />
+              <input
+                className="tapqdocs-modal-item-qty"
+                type="number"
+                placeholder="Qty"
+                value={item.qty}
+                onChange={(e) => handleItemChange(item.id, "qty", e.target.value)}
+              />
+              <input
+                className="tapqdocs-modal-item-price"
+                type="number"
+                placeholder="Price"
+                value={item.price}
+                onChange={(e) => handleItemChange(item.id, "price", e.target.value)}
+              />
+              <button
+                className="tapqdocs-modal-remove-btn"
+                onClick={() => handleRemoveItem(item.id)}
+                title="Remove item"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button className="tapqdocs-modal-add-btn" onClick={handleAddItem}>
+            + Add Item
+          </button>
+
+          <div className="tapqdocs-modal-section-title">Round Off</div>
+          {roundOffs.map((ro) => (
+            <div key={ro.id} className="tapqdocs-modal-roundoff-row">
+              <button
+                className="tapqdocs-modal-sign-btn"
+                onClick={() => handleToggleRoundOffSign(ro.id)}
+                title="Toggle sign"
+              >
+                {ro.sign}
+              </button>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={ro.amount}
+                onChange={(e) => handleRoundOffChange(ro.id, "amount", e.target.value)}
+              />
+              <button
+                className="tapqdocs-modal-remove-btn"
+                onClick={() => handleRemoveRoundOff(ro.id)}
+                title="Remove round off"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button className="tapqdocs-modal-add-btn" onClick={handleAddRoundOff}>
+            + Add Round Off
+          </button>
+
+          <label className="tapqdocs-modal-checkbox-label">
+            <input
+              type="checkbox"
+              checked={noSignature}
+              onChange={(e) => setNoSignature(e.target.checked)}
+            />
+            No Signature (leave blank for manual signing)
+          </label>
+
+          <div className="tapqdocs-modal-total-row">
+            <span>Final Total</span>
+            <span>Rs. {(totalRoundOff !== 0 ? balancePayable : total).toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="tapqdocs-modal-footer">
+          <button className="tapqdocs-modal-cancel-btn" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </button>
+          <button
+            className="tapqdocs-modal-save-btn"
+            onClick={handleSave}
+            disabled={isSaving || !formValid}
+          >
+            {isSaving ? "⏳ Saving..." : "✓ Save & Regenerate PDF"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TapqDocs() {
   const navigate = useNavigate();
 
@@ -87,6 +548,9 @@ export default function TapqDocs() {
   // can show a per-row loading state instead of blocking the whole page.
   const [regeneratingId, setRegeneratingId] = useState(null);
   const [regenerateError, setRegenerateError] = useState(null);
+
+  // Tracks which document (if any) is currently open in the Edit modal.
+  const [editingDoc, setEditingDoc] = useState(null);
 
   const qrCanvasRef = useRef(null);
 
@@ -274,6 +738,25 @@ export default function TapqDocs() {
     }
   };
 
+  // ── SAVE HANDLER FOR THE EDIT MODAL ────────────────────────────────────
+  // Patches the edited document back into local state so the table
+  // reflects the change immediately, without needing a full refetch.
+  const handleDocSaved = (updatedRecord) => {
+    setRawDocuments((prev) => {
+      const key = editingDoc.__collectionKey;
+      const list = prev[key] || [];
+      return {
+        ...prev,
+        [key]: list.map((d) =>
+          d.documentId === editingDoc.documentId
+            ? { ...updatedRecord, documentId: editingDoc.documentId }
+            : d,
+        ),
+      };
+    });
+    setEditingDoc(null);
+  };
+
   // ── RENDER ────────────────────────────────────────────────────────────
   return (
     <div className="tapqdocs-admin">
@@ -414,7 +897,14 @@ export default function TapqDocs() {
                           ? `Rs. ${Number(doc.totals.total).toFixed(2)}`
                           : "—"}
                       </span>
-                      <span>
+                      <span className="tapqdocs-actions-cell">
+                        <button
+                          className="tapqdocs-btn-edit"
+                          onClick={() => setEditingDoc(doc)}
+                          title="Edit this document"
+                        >
+                          ✎ Edit
+                        </button>
                         <button
                           className="tapqdocs-btn-regenerate"
                           onClick={() => handleRegeneratePDF(doc)}
@@ -443,6 +933,15 @@ export default function TapqDocs() {
           </>
         )}
       </div>
+
+      {editingDoc && (
+        <EditDocumentModal
+          doc={editingDoc}
+          qrCanvasRef={qrCanvasRef}
+          onCancel={() => setEditingDoc(null)}
+          onSaved={handleDocSaved}
+        />
+      )}
 
       <div
         id="tapqdocs-qr-hidden"
