@@ -10,6 +10,7 @@ import {
   generatePDF,
   GST_STATES,
   isFormValid,
+  getRoundOffLabel, // NEW — shared label-fallback helper from AdminTapqPdf.js
 } from "./AdminTapqPdf";
 import API_BASE_URL from "./apiConfig";
 
@@ -110,12 +111,16 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
   // Existing saved documents may have round-off data stored under the old
   // `appliedAdvances` name or the newer `appliedRoundOffs` name — read
   // whichever is present so older records still load correctly here.
+  // CHANGED — each entry now also carries a `label` (falls back to "" if
+  // the saved record predates the label feature, which then falls back to
+  // "Round off" everywhere via getRoundOffLabel()).
   const savedRoundOffs = doc.appliedRoundOffs || doc.appliedAdvances || [];
   const [roundOffs, setRoundOffs] = useState(
     savedRoundOffs.map((ro, idx) => ({
       id: idx,
       amount: ro.amount ?? "",
       sign: ro.sign === "-" ? "-" : "+",
+      label: ro.label || "",
     })),
   );
   const [roundOffCounter, setRoundOffCounter] = useState(roundOffs.length);
@@ -167,8 +172,21 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
+  // NEW — lets the user change the IGST / CGST / SGST percentage directly
+  // in the edit modal, same as the % inputs on the main create form. Was
+  // previously missing here — gstRates was loaded from the saved document
+  // but there was no way to edit it.
+  const handleGstRateChange = (e) => {
+    const { name, value } = e.target;
+    setGstRates((prev) => ({ ...prev, [name]: parseFloat(value) || 0 }));
+  };
+
+  // CHANGED — new round-off rows also start with an empty `label`.
   const handleAddRoundOff = () => {
-    setRoundOffs((prev) => [...prev, { id: roundOffCounter, amount: "", sign: "+" }]);
+    setRoundOffs((prev) => [
+      ...prev,
+      { id: roundOffCounter, amount: "", sign: "+", label: "" },
+    ]);
     setRoundOffCounter((c) => c + 1);
   };
 
@@ -189,6 +207,7 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
   // calculateTotals only counts entries whose `applied` flag is true — every
   // row in this modal is meant to apply directly, so mark them all applied
   // at calculation time rather than requiring a separate "Apply" step.
+  // `label` rides along inside each spread entry, same as amount/sign.
   const roundOffEntriesForCalc = roundOffs
     .filter((ro) => ro.amount !== "" && parseFloat(ro.amount) > 0)
     .map((ro) => ({ ...ro, applied: true }));
@@ -237,6 +256,8 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
         appliedRoundOffs: appliedRoundOffs.map((ro) => ({
           amount: ro.amount,
           sign: ro.sign,
+          // CHANGED — send the custom label, defaulting to "Round off"
+          label: ro.label && ro.label.trim() ? ro.label.trim() : "Round off",
         })),
       };
 
@@ -412,57 +433,128 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
           </div>
 
           <div className="tapqdocs-modal-section-title">Items</div>
-          {items.map((item) => (
-            <div key={item.id} className="tapqdocs-modal-item-row">
-              <input
-                className="tapqdocs-modal-item-desc"
-                placeholder="Description"
-                value={item.desc}
-                onChange={(e) => handleItemChange(item.id, "desc", e.target.value)}
-              />
-              <select
-                value={item.codeType || "HSN"}
-                onChange={(e) => handleItemChange(item.id, "codeType", e.target.value)}
-              >
-                <option value="HSN">HSN</option>
-                <option value="SAC">SAC</option>
-              </select>
-              <input
-                className="tapqdocs-modal-item-code"
-                placeholder="Code"
-                value={item.hsn}
-                onChange={(e) => handleItemChange(item.id, "hsn", e.target.value)}
-              />
-              <input
-                className="tapqdocs-modal-item-qty"
-                type="number"
-                placeholder="Qty"
-                value={item.qty}
-                onChange={(e) => handleItemChange(item.id, "qty", e.target.value)}
-              />
-              <input
-                className="tapqdocs-modal-item-price"
-                type="number"
-                placeholder="Price"
-                value={item.price}
-                onChange={(e) => handleItemChange(item.id, "price", e.target.value)}
-              />
-              <button
-                className="tapqdocs-modal-remove-btn"
-                onClick={() => handleRemoveItem(item.id)}
-                title="Remove item"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {items.map((item) => {
+            // NEW — per-line GST Amt, computed the same way as the main
+            // create form's item table (qty * price * gst.rate / 100).
+            // `gst` here is the value already returned by calculateTotals()
+            // below in this component (in scope via closure).
+            const q = parseFloat(item.qty) || 0;
+            const p = parseFloat(item.price) || 0;
+            const lineTaxable = q * p;
+            const lineGst = (lineTaxable * gst.rate) / 100;
+            return (
+              <div key={item.id} className="tapqdocs-modal-item-row">
+                <input
+                  className="tapqdocs-modal-item-desc"
+                  placeholder="Description"
+                  value={item.desc}
+                  onChange={(e) => handleItemChange(item.id, "desc", e.target.value)}
+                />
+                <select
+                  value={item.codeType || "HSN"}
+                  onChange={(e) => handleItemChange(item.id, "codeType", e.target.value)}
+                >
+                  <option value="HSN">HSN</option>
+                  <option value="SAC">SAC</option>
+                </select>
+                <input
+                  className="tapqdocs-modal-item-code"
+                  placeholder="Code"
+                  value={item.hsn}
+                  onChange={(e) => handleItemChange(item.id, "hsn", e.target.value)}
+                />
+                <input
+                  className="tapqdocs-modal-item-qty"
+                  type="number"
+                  placeholder="Qty"
+                  value={item.qty}
+                  onChange={(e) => handleItemChange(item.id, "qty", e.target.value)}
+                />
+                <input
+                  className="tapqdocs-modal-item-price"
+                  type="number"
+                  placeholder="Price"
+                  value={item.price}
+                  onChange={(e) => handleItemChange(item.id, "price", e.target.value)}
+                />
+                {/* NEW — read-only GST Amt for this line, same as the
+                    "GST Amt" column shown in the main create form. */}
+                <span
+                  className="tapqdocs-modal-item-gstamt"
+                  title="GST amount for this line"
+                >
+                  {lineGst.toFixed(2)}
+                </span>
+                <button
+                  className="tapqdocs-modal-remove-btn"
+                  onClick={() => handleRemoveItem(item.id)}
+                  title="Remove item"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
           <button className="tapqdocs-modal-add-btn" onClick={handleAddItem}>
             + Add Item
           </button>
 
+          {/* NEW — editable GST % inputs, same as the main create form's
+              IGST / CGST+SGST rate row. gstRates was already loaded from
+              the saved document but had no UI to change it here before. */}
+          {formData.gstType === "igst" && (
+            <div className="tapqdocs-modal-gst-row">
+              <label>IGST (%)</label>
+              <input
+                type="number"
+                name="igstRate"
+                value={gstRates.igstRate}
+                min="0"
+                max="100"
+                onWheel={(e) => e.target.blur()}
+                onChange={handleGstRateChange}
+              />
+            </div>
+          )}
+          {formData.gstType === "cgst_sgst" && (
+            <div className="tapqdocs-modal-gst-row">
+              <label>CGST (%)</label>
+              <input
+                type="number"
+                name="cgstRate"
+                value={gstRates.cgstRate}
+                min="0"
+                max="100"
+                onWheel={(e) => e.target.blur()}
+                onChange={handleGstRateChange}
+              />
+              <label>SGST (%)</label>
+              <input
+                type="number"
+                name="sgstRate"
+                value={gstRates.sgstRate}
+                min="0"
+                max="100"
+                onWheel={(e) => e.target.blur()}
+                onChange={handleGstRateChange}
+              />
+            </div>
+          )}
+
           <div className="tapqdocs-modal-section-title">Round Off</div>
           {roundOffs.map((ro) => (
             <div key={ro.id} className="tapqdocs-modal-roundoff-row">
+              {/* NEW — editable label per round-off row. Placeholder shows
+                  the default "Round off" text; leaving it blank keeps that
+                  default everywhere (display, saved data, PDF). */}
+              <input
+                type="text"
+                className="tapqdocs-modal-roundoff-label"
+                placeholder="Round off"
+                maxLength={40}
+                value={ro.label}
+                onChange={(e) => handleRoundOffChange(ro.id, "label", e.target.value)}
+              />
               <button
                 className="tapqdocs-modal-sign-btn"
                 onClick={() => handleToggleRoundOffSign(ro.id)}
@@ -686,10 +778,19 @@ export default function TapqDocs() {
 
       const dueDate = doc.document?.dueDate || "";
 
-      const appliedAdvances = (doc.appliedAdvances || []).map((adv, idx) => ({
+      // FIXED — this was only ever reading doc.appliedAdvances (the old,
+      // pre-rename field), so any document saved under the current
+      // appliedRoundOffs system was silently treated as having zero
+      // round-offs. Read appliedRoundOffs first, falling back to
+      // appliedAdvances only for legacy records saved before the rename.
+      // Each entry's custom `label` is carried through too (defaults to ""
+      // -> "Round off" via getRoundOffLabel() inside generatePDF).
+      const savedRoundOffs = doc.appliedRoundOffs || doc.appliedAdvances || [];
+      const roundOffEntries = savedRoundOffs.map((ro, idx) => ({
         id: idx,
-        advId: adv.advId || "",
-        amount: adv.amount,
+        amount: ro.amount,
+        sign: ro.sign === "-" ? "-" : "+",
+        label: ro.label || "",
         applied: true,
       }));
 
@@ -697,12 +798,12 @@ export default function TapqDocs() {
         items,
         formData.gstType,
         gstRates,
-        appliedAdvances,
+        roundOffEntries,
       );
 
       // Build the UPI QR for whatever's actually owed on this document.
       const amountForQR =
-        totals.totalAdvance > 0 ? totals.balancePayable : totals.total;
+        totals.totalRoundOff !== 0 ? totals.balancePayable : totals.total;
 
       const [qrData, sigImg] = await Promise.all([
         generateQR(
@@ -714,19 +815,22 @@ export default function TapqDocs() {
         getSignatureDataURL(),
       ]);
 
+      // FIXED — pass totalRoundOff/appliedRoundOffs (what generatePDF
+      // actually reads), instead of the old totalAdvance/appliedAdvances
+      // names which generatePDF doesn't look for at all.
       await generatePDF({
         formData,
         items,
         gstRates,
         dueDate,
-        totalAdvance: totals.totalAdvance,
+        totalRoundOff: totals.totalRoundOff,
         balancePayable: totals.balancePayable,
         total: totals.total,
         taxable: totals.taxable,
         gstTotal: totals.gstTotal,
         qrData,
         sigImg,
-        appliedAdvances: totals.appliedAdvances,
+        appliedRoundOffs: totals.appliedRoundOffs,
       });
     } catch (err) {
       console.error("Failed to regenerate PDF:", err);

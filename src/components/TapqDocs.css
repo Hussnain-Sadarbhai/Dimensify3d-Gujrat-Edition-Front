@@ -661,3 +661,69 @@
     flex-wrap: wrap;
   }
 }
+
+
+/* ── NEW — per-item GST Amt (shown after Price, before the × remove btn) ── */
+.tapqdocs-modal-item-gstamt {
+  width: 56px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+/* ── NEW — GST % row (IGST, or CGST + SGST), placed under "+ Add Item" ── */
+.tapqdocs-modal-gst-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tapqdocs-modal-gst-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a2332;
+  white-space: nowrap;
+}
+
+.tapqdocs-modal-gst-row input {
+  width: 70px;
+  padding: 7px 8px;
+  border: 1px solid #d4dae4;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #1a2332;
+}
+.tapqdocs-modal-gst-row input:focus {
+  outline: none;
+  border-color: #3a7bd5;
+}
+
+/* Hide number spin arrows on the % fields, matching the clean look of the
+   rest of the form (Chrome/Safari + Firefox). */
+.tapqdocs-modal-gst-row input::-webkit-outer-spin-button,
+.tapqdocs-modal-gst-row input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.tapqdocs-modal-gst-row input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ── NEW — round-off custom label input, sits before the sign toggle ──── */
+.tapqdocs-modal-roundoff-label {
+  flex: 2;
+  min-width: 0;
+}
+
+/* The existing ".tapqdocs-modal-roundoff-row input" rule already applies
+   flex: 1 to every input in the row (label + amount) — this narrows just
+   the amount field back down so the label gets more room, matching the
+   proportions in the "+ Add Item" row above it. */
+.tapqdocs-modal-roundoff-row input[type="number"] {
+  flex: 1;
+  max-width: 100px;
+  text-align: right;
+}

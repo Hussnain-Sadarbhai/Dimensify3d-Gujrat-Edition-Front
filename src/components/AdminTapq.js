@@ -101,6 +101,12 @@ function formatDocTypeLabel(docType) {
     .join(" ");
 }
 
+// NEW — returns the custom label for a round-off entry, or "Round off"
+// if the user left it blank / never typed one.
+function roundOffDisplayLabel(entry) {
+  return entry?.label && entry.label.trim() ? entry.label.trim() : "Round off";
+}
+
 function NumInput({
   value,
   onChange,
@@ -430,7 +436,8 @@ function ReviewModal({
           </div>
           {appliedRoundOffs.map((ro, idx) => (
             <div key={idx} style={rowStyle}>
-              <span style={rowLabelStyle}>Round off</span>
+              {/* CHANGED — uses the entry's custom label, falls back to "Round off" */}
+              <span style={rowLabelStyle}>{roundOffDisplayLabel(ro)}</span>
               <span style={{ color: "#1e8c50", fontWeight: 600 }}>
                 {ro.sign === "-" ? "− " : "+ "}Rs.{" "}
                 {parseFloat(ro.amount).toFixed(2)}
@@ -715,11 +722,17 @@ export default function AdminTapq() {
   };
 
   // ── ROUND OFF HANDLERS ─────────────────────────────────────────────────
+  // CHANGED — every new round-off entry now also carries a `label` field.
+  // It starts empty; the input shows placeholder text "Round off" so the
+  // user sees the default without it being "typed in", and if they never
+  // touch it, roundOffDisplayLabel()/backend both fall back to "Round off".
 
   const handleOpenRoundOffSection = () => {
     setShowRoundOffSection(true);
     const newId = roundOffEntryCounter;
-    setRoundOffEntries([{ id: newId, amount: "", sign: "+", applied: false }]);
+    setRoundOffEntries([
+      { id: newId, amount: "", sign: "+", label: "", applied: false },
+    ]);
     setRoundOffEntryCounter(newId + 1);
   };
 
@@ -752,7 +765,7 @@ export default function AdminTapq() {
     const newId = roundOffEntryCounter;
     setRoundOffEntries((prev) => [
       ...prev,
-      { id: newId, amount: "", sign: "+", applied: false },
+      { id: newId, amount: "", sign: "+", label: "", applied: false },
     ]);
     setRoundOffEntryCounter(newId + 1);
   };
@@ -772,6 +785,12 @@ export default function AdminTapq() {
   };
 
   // ── TOTALS ────────────────────────────────────────────────────────────────
+  // NOTE: calculateTotals() lives in AdminTapqPdf.js. Make sure the mapping
+  // it uses to build `appliedRoundOffs` from `roundOffEntries` also passes
+  // through `label`, e.g.:
+  //   roundOffEntries.filter(e => e.applied).map(e => ({
+  //     id: e.id, amount: e.amount, sign: e.sign, label: e.label,
+  //   }))
 
   const {
     taxable,
@@ -824,6 +843,8 @@ export default function AdminTapq() {
       appliedRoundOffs: appliedRoundOffs.map((ro) => ({
         amount: ro.amount,
         sign: ro.sign,
+        // CHANGED — send the custom label, defaulting to "Round off"
+        label: ro.label && ro.label.trim() ? ro.label.trim() : "Round off",
       })),
     };
 
@@ -1371,7 +1392,8 @@ export default function AdminTapq() {
                           </span>
                           {entry.applied && (
                             <span className="tapq-advance-entry-id-badge">
-                              Round off
+                              {/* CHANGED — shows custom label if user set one */}
+                              {roundOffDisplayLabel(entry)}
                             </span>
                           )}
                         </div>
@@ -1380,7 +1402,8 @@ export default function AdminTapq() {
                           <div className="tapq-advance-applied-row">
                             <div className="tapq-advance-applied-info">
                               <span className="tapq-advance-applied-id">
-                                Round off
+                                {/* CHANGED — shows custom label if user set one */}
+                                {roundOffDisplayLabel(entry)}
                               </span>
                               <span className="tapq-advance-applied-amt">
                                 {entry.sign === "-" ? "− " : "+ "}Rs.{" "}
@@ -1412,9 +1435,25 @@ export default function AdminTapq() {
                           <div className="tapq-advance-input-group">
                             <div className="tapq-advance-id-wrapper">
                               <span className="tapq-advance-id-icon">🔖</span>
-                              <span className="tapq-advance-fixed-label">
-                                Round off
-                              </span>
+                              {/* CHANGED — was a static "Round off" span,
+                                  now an editable text input. Placeholder
+                                  shows "Round off" as the default; if the
+                                  user leaves it blank that default is used
+                                  everywhere (display + saved data). */}
+                              <input
+                                type="text"
+                                className="tapq-advance-fixed-label tapq-advance-label-input"
+                                placeholder="Round off"
+                                value={entry.label}
+                                maxLength={40}
+                                onChange={(e) =>
+                                  handleRoundOffEntryChange(
+                                    entry.id,
+                                    "label",
+                                    e.target.value,
+                                  )
+                                }
+                              />
                             </div>
                             <div className="tapq-advance-input-row">
                               <button
@@ -1538,7 +1577,8 @@ export default function AdminTapq() {
 
               {appliedRoundOffs.map((ro, idx) => (
                 <div key={ro.id} className="tapq-total-row tapq-advance-row">
-                  <span>Round off</span>
+                  {/* CHANGED — uses the entry's custom label */}
+                  <span>{roundOffDisplayLabel(ro)}</span>
                   <span>
                     {ro.sign === "-" ? "− " : "+ "}Rs.{" "}
                     {parseFloat(ro.amount).toFixed(2)}

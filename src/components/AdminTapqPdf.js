@@ -251,6 +251,16 @@ export const getGstInfo = (gstType, gstRates) => {
   }
 };
 
+// NEW — resolves the display label for a round-off entry/applied-round-off
+// object: uses the user's custom text if they typed one, otherwise falls
+// back to the default "Round off". Shared by calculateTotals() (implicitly,
+// via passthrough) and generatePDF() so the PDF always matches what the
+// on-screen totals/review modal show.
+export const getRoundOffLabel = (ro) =>
+  ro && ro.label && String(ro.label).trim()
+    ? String(ro.label).trim()
+    : "Round off";
+
 export const calculateTotals = (items, gstType, gstRates, roundOffEntries) => {
   const gst = getGstInfo(gstType, gstRates);
   let taxable = 0;
@@ -263,7 +273,10 @@ export const calculateTotals = (items, gstType, gstRates, roundOffEntries) => {
   const total = taxable + gstTotal;
 
   // Round-off entries: each is applied with a sign ('+' or '-') and adjusts
-  // the final total directly. Fixed label "Round off" — no payment ID.
+  // the final total directly. Each entry carries its own custom `label`
+  // (defaults to "Round off" via getRoundOffLabel() when blank) — the
+  // filter below keeps the full entry object as-is, so `label` (along with
+  // id/amount/sign) passes straight through into `appliedRoundOffs`.
   const appliedRoundOffs = (roundOffEntries || []).filter(
     (e) => e.applied && parseFloat(e.amount) > 0,
   );
@@ -416,10 +429,14 @@ export const generatePDF = async (params) => {
 
   const gst = getGstInfo(formData.gstType, gstRates);
 
+  // FIXED — MT (top margin) was 0, which made the header sit flush with the
+  // page top with no breathing room above the logo. Bumped to 14pt so
+  // there's proper whitespace padding above the header, matching the
+  // reference layout.
   const W = 595.28,
     ML = 28,
     MR = 28,
-    MT = 0; // no top margin — header sits flush with page top
+    MT = 14;
 
   const C = {
     darkBlue: [26, 35, 50],
@@ -435,19 +452,35 @@ export const generatePDF = async (params) => {
   };
 
   // ── HEADER CONSTANTS ─────────────────────────────────────────────────────
-  // Fixed header band height — same for ALL document types
-  // Enlarged to fit the bigger logo + brand text block requested.
-  const HEADER_BAND_H = 110; // total header height in pt
-  const LOGO_SIZE = 108; // logo width & height (square) — enlarged
+  // CHANGED — sizes increased back up to match the reference design (the
+  // previous pass shrank these too far — logo ended up tiny at 33pt and
+  // looked misplaced). Brand text sizes are defined first; LOGO_SIZE is
+  // set slightly larger than the text block so the icon reads with the
+  // same visual weight as in the reference screenshot.
+  // FIXED — brand name/tagline sizes reduced (were 24/12, read too large/
+  // bold compared to the reference) so the whole logo+text lockup is more
+  // compact, matching the reference screenshot.
+  const brandNameSize = 18;
+  const taglineSize = 9;
+  const brandLineGap = 4; // gap between name and tagline
+  const brandBlockH = brandNameSize + brandLineGap + taglineSize;
+
+  const LOGO_SIZE = brandBlockH + 2; // logo taller than the text block
+  // FIXED — left padding before the logo so it doesn't sit flush against
+  // the page margin; adds breathing room from the left edge to the icon.
+  const LOGO_LEFT_PAD = 8;
+  // FIXED — was LOGO_SIZE + 14 (too tight, header felt cramped against the
+  // separator line below it). Bumped to + 22 for extra top/bottom padding
+  // inside the header band, matching the reference layout.
+  const HEADER_BAND_H = LOGO_SIZE + 22;
 
   // Auto-scale doc title font so long titles never overflow into brand area.
-  // Doc title is intentionally kept SMALL relative to the brand block now
-  // (per reference design): "TAX INVOICE" / "QUOTATION" -> 15pt
-  // "PROFORMA INVOICE" -> 13pt, "ADVANCE PAYMENT RECEIPT" -> shrink to fit
+  // CHANGED — sizes brought back up closer to the reference, where the doc
+  // title reads at roughly the same visual weight as the brand name.
   const getDocTitleSize = (text) => {
-    if (text.length <= 16) return 15;
-    if (text.length <= 20) return 13;
-    return 11; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 11pt
+    if (text.length <= 16) return 16;
+    if (text.length <= 20) return 14;
+    return 12; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 12pt
   };
   const docTitleSize = getDocTitleSize(docType);
 
@@ -563,22 +596,95 @@ export const generatePDF = async (params) => {
   };
 
   // ── PRELOAD LOGO AS BASE64 ────────────────────────────────────────────
+  // CHANGED — now also trims any transparent padding baked into the
+  // source PNG itself before measuring it. Many logo files carry extra
+  // invisible margin around the icon; if we measure/aspect-ratio the raw
+  // image, that margin gets scaled up along with everything else and
+  // shows up as unwanted extra gap next to the brand text. Cropping to
+  // the actual non-transparent bounding box first means logoDrawW/H (and
+  // the aspect ratio) reflect only the visible icon.
   const getLogoDataURL = () =>
     new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
         const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        let minX = w,
+          minY = h,
+          maxX = 0,
+          maxY = 0;
+        try {
+          const data = ctx.getImageData(0, 0, w, h).data;
+          for (let yy = 0; yy < h; yy++) {
+            for (let xx = 0; xx < w; xx++) {
+              const alpha = data[(yy * w + xx) * 4 + 3];
+              if (alpha > 10) {
+                if (xx < minX) minX = xx;
+                if (xx > maxX) maxX = xx;
+                if (yy < minY) minY = yy;
+                if (yy > maxY) maxY = yy;
+              }
+            }
+          }
+        } catch (e) {
+          // getImageData can fail on a tainted canvas (CORS) — fall back
+          // to the untouched full image rather than breaking the PDF.
+          minX = 0;
+          minY = 0;
+          maxX = w - 1;
+          maxY = h - 1;
+        }
+        if (maxX < minX || maxY < minY) {
+          minX = 0;
+          minY = 0;
+          maxX = w - 1;
+          maxY = h - 1;
+        }
+
+        const trimmedW = maxX - minX + 1;
+        const trimmedH = maxY - minY + 1;
+        const trimmedCanvas = document.createElement("canvas");
+        trimmedCanvas.width = trimmedW;
+        trimmedCanvas.height = trimmedH;
+        trimmedCanvas
+          .getContext("2d")
+          .drawImage(
+            canvas,
+            minX,
+            minY,
+            trimmedW,
+            trimmedH,
+            0,
+            0,
+            trimmedW,
+            trimmedH,
+          );
+
+        resolve({
+          dataURL: trimmedCanvas.toDataURL("image/png"),
+          width: trimmedW,
+          height: trimmedH,
+        });
       };
       img.onerror = () => resolve(null);
       img.src = logo;
     });
 
-  const logoDataURL = await getLogoDataURL();
+  const logoInfo = await getLogoDataURL();
+  const logoDataURL = logoInfo ? logoInfo.dataURL : null;
+  // Target height = LOGO_SIZE (matches the space reserved for it); width is
+  // derived from the logo's real aspect ratio instead of being forced
+  // square, so the icon renders exactly as it does elsewhere in the app.
+  const logoAspect = logoInfo ? logoInfo.width / logoInfo.height : 1;
+  const logoDrawH = LOGO_SIZE;
+  const logoDrawW = LOGO_SIZE * logoAspect;
 
   // ── ═══════════════════════════════════════════════════════════════════
   //    STRUCTURED HEADER — identical layout for ALL document types
@@ -592,20 +698,18 @@ export const generatePDF = async (params) => {
   const headerTopY = MT;
   const headerMidY = headerTopY + HEADER_BAND_H / 2; // vertical center of band
 
-  // ── Logo: vertically centered in header band ──────────────────────────
-  const logoX = ML;
-  const logoY = headerMidY - LOGO_SIZE / 2; // centered vertically
+  // ── Logo: vertically centered in header band, aspect ratio preserved ──
+  const logoX = ML + LOGO_LEFT_PAD;
+  const logoY = headerMidY - logoDrawH / 2; // centered vertically
   if (logoDataURL) {
-    doc.addImage(logoDataURL, "PNG", logoX, logoY, LOGO_SIZE, LOGO_SIZE);
+    doc.addImage(logoDataURL, "PNG", logoX, logoY, logoDrawW, logoDrawH);
   }
 
-  // ── Brand text: stacked, tightly next to logo, vertically centered ────
-  // Enlarged brand name + tagline to match reference design.
-  const brandNameSize = 26;
-  const taglineSize = 14;
-  const brandLineGap = 6; // gap between name and tagline
-  const brandBlockH = brandNameSize + brandLineGap + taglineSize;
-  const brandTextX = logoX + LOGO_SIZE - 4; // slight overlap — brand text flush against logo
+  // ── Brand text: stacked, next to logo with proper gap, vertically
+  //    centered. FIXED — gap was only +2 (logo and text nearly touching,
+  //    which read as cramped). Bumped to +14 so there's clear whitespace
+  //    between the icon and "DIMENSIFY3D", matching the reference layout.
+  const brandTextX = logoX + logoDrawW + 14;
 
   // Baseline of brand name so the whole text block is vertically centered
   const brandNameBaselineY = headerMidY - brandBlockH / 2 + brandNameSize;
@@ -619,11 +723,17 @@ export const generatePDF = async (params) => {
   sf("normal", taglineSize, C.grey);
   tx("3D Printing Services", brandTextX, taglineBaselineY);
 
-  // ── Document title: right-aligned, small, vertically centered ─────────
+  // ── Document title: aligned with the third detail column below (same
+  //    x as "BILLED TO" / c3), small, vertically centered. CHANGED — was
+  //    right-aligned flush against the page's right margin, which left a
+  //    large empty gap and made it look disconnected/"too far right".
+  //    Aligning it with the BILLED TO column ties it visually to the
+  //    content below instead of floating in the corner.
   const docTitleBaselineY = headerMidY + docTitleSize / 2 - 2; // optical center
+  const docTitleX = ML + 348; // same x as c3 (BILLED TO column), defined again below
 
   sf("bold", docTitleSize, C.darkBlue);
-  tx(docType, W - MR, docTitleBaselineY, { align: "right" });
+  tx(docType, docTitleX, docTitleBaselineY);
 
   // ── Dark separator line below header ──────────────────────────────────
   y = headerTopY + HEADER_BAND_H + 6;
@@ -829,16 +939,20 @@ export const generatePDF = async (params) => {
   );
 
   // ── ROUND OFF ───────────────────────────────────────────────────────────
-  // Every applied round-off entry renders as a single fixed "Round off" line
-  // with a +/- sign, applied directly to the total (no advance/payment-ID
-  // language). If any round-off was applied, the final row (previously
+  // Every applied round-off entry renders as one line with a +/- sign,
+  // applied directly to the total. CHANGED — the line label now uses each
+  // entry's own custom text (ro.label) via getRoundOffLabel(), instead of
+  // being hardcoded to "Round off". If the user never typed a custom name,
+  // getRoundOffLabel() falls back to "Round off" automatically — so the
+  // PDF always matches whatever is shown on-screen in the totals grid and
+  // review modal. If any round-off was applied, the final row (previously
   // "Balance Payable") is now labeled "Total Amount" = final total.
   if (params.appliedRoundOffs?.length > 0) {
     y += 2;
     params.appliedRoundOffs.forEach((ro) => {
       const amt = parseFloat(ro.amount) || 0;
       const signStr = ro.sign === "-" ? "- " : "+ ";
-      totRow("Round off", signStr + rs(amt), false, C.green);
+      totRow(getRoundOffLabel(ro), signStr + rs(amt), false, C.green);
     });
     y += 12;
     ln(tRX - 60, y, W - MR, y, C.accent, 1);
