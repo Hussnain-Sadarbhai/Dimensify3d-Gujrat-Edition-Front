@@ -50,6 +50,7 @@ import AdminTapq from "./components/AdminTapq";
 import TapqDocs from "./components/TapqDocs";
 import AdminSoa from "./components/AdminSoa";
 import LandingPage from "./components/LandingPage";
+import AdminOrdrMang from "./components/AdminOrdrMang";
 
 // Protected Route Component
 const ProtectedAdminRoute = ({ children }) => {
@@ -234,6 +235,14 @@ function App() {
               element={
                 <ProtectedAdminRoute>
                   <AdminSoa />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route
+              path="/adminordermng"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminOrdrMang />
                 </ProtectedAdminRoute>
               }
             />

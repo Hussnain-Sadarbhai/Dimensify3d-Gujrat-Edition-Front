@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon, PaperclipIcon, LucidePaperclip } from 'lucide-react';
+import { CreditCard, Plus, History, ArrowDownCircle, HelpCircle,UserCheck, ShoppingCart, Paperclip, ListOrdered, LogOut, LucideListOrdered, HomeIcon, Moon, PaperclipIcon, LucidePaperclip, ListCheck } from 'lucide-react';
 import logo from "../images/logo-1.png"
 import { useNavigate } from 'react-router-dom';
 
@@ -155,6 +155,10 @@ function AdminDashboard() {
         navigate("/adminsoa")
     }
 
+    function goMngOrd(){
+        navigate("/adminordermng")
+    }
+
     const menuItems = [
         {
             title: 'Help Requests',
@@ -215,6 +219,12 @@ function AdminDashboard() {
             icon:Moon,
             onClick: goLandingPageOrders,
             description: 'Landing Page Orders'
+        },
+        {
+            title: 'Order Management',
+            icon:ListCheck,
+            onClick: goMngOrd,
+            description: 'Manage Orders Priority'
         },
         {
             title: 'Admin Online Store Dashboard',
