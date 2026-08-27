@@ -308,6 +308,11 @@ const STLSlicer = () => {
   // Infill percentage options
   const infillOptions = [20, 40, 60, 80, 100];
 
+  // Scroll to top whenever this page is navigated to
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
+
   // Fetch available coupons when component mounts
   useEffect(() => {
     fetchAvailableCoupons();

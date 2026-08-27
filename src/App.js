@@ -70,8 +70,9 @@ function App() {
         <div className="App">
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<STLSlicer />} />
-            <Route path="/header2" element={<Header2/>} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/ExploreFeatures" element={<STLSlicer />} />
+            <Route path="/header2" element={<Header2 />} />
             <Route path="/help" element={<HelpSection />} />
             <Route path="/adminlogin" element={<AdminLogin />} />
             <Route path="/checkout" element={<Checkout />} />
@@ -98,8 +99,7 @@ function App() {
             />
             <Route path="/account" element={<Account />} />
             <Route path="/itemdetails" element={<ItemDetails />} />
-            <Route path="/landing-page" element={<LandingPage/>} />
-            <Route path="/myhelprequest" element={<MyHelpReq/>} />
+            <Route path="/myhelprequest" element={<MyHelpReq />} />
 
             {/* Protected Admin Routes */}
             <Route

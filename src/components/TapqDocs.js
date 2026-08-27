@@ -11,6 +11,9 @@ import {
   GST_STATES,
   isFormValid,
   getRoundOffLabel, // NEW — shared label-fallback helper from AdminTapqPdf.js
+  TERMS_DATA, // NEW — default terms, used to seed the editable textarea
+  termsDataToText, // NEW — converts TERMS_DATA structure -> editable plain text
+  textToTermsData, // NEW — converts edited plain text back -> TERMS_DATA structure
 } from "./AdminTapqPdf";
 import API_BASE_URL from "./apiConfig";
 
@@ -83,6 +86,14 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
     custState: doc.customer?.state || "Karnataka, Code : 29",
     custGstin: doc.customer?.gstin || "",
     invoiceNum: doc.document?.invoiceNum || "",
+    // FIXED — the original document date was never loaded here, so
+    // generatePDF() had nothing to use and fell back to today's date
+    // (todayStr()) whenever a document was edited & saved. The saved
+    // date shown in the table (doc.document?.invoiceDate) is now carried
+    // into formData so the regenerated PDF keeps the ORIGINAL doc date,
+    // not the date the edit happened to be made on. Only fall back to
+    // todayStr() for legacy records that never had a date saved at all.
+    invoiceDate: doc.document?.invoiceDate || todayStr(),
     docType: cfg ? cfg.docType : doc.document?.docType || "TAX INVOICE",
     gstType: doc.document?.gstType || "igst",
     specialNotes: doc.document?.specialNotes || "",
@@ -128,6 +139,14 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
   const [noSignature, setNoSignature] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // NEW — Terms & Conditions are editable here for THIS PDF regeneration
+  // only. They are intentionally never sent to the backend / saved to the
+  // document record — every time the modal opens, this starts from the
+  // same default TERMS_DATA (from AdminTapqPdf.js), not from anything
+  // previously stored. Edits only affect the PDF produced by "Save &
+  // Regenerate PDF" for this one action.
+  const [termsText, setTermsText] = useState(() => termsDataToText(TERMS_DATA));
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -236,6 +255,10 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
         custState: formData.custState,
         custGstin: formData.custGstin,
         invoiceNum: formData.invoiceNum,
+        // FIXED — send the ORIGINAL doc date back to the backend so the
+        // database record's date is never overwritten with "today" just
+        // because an edit was made.
+        invoiceDate: formData.invoiceDate,
         docType: formData.docType, // locked, sent unchanged
         gstType: formData.gstType,
         dueDate,
@@ -259,6 +282,9 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
           // CHANGED — send the custom label, defaulting to "Round off"
           label: ro.label && ro.label.trim() ? ro.label.trim() : "Round off",
         })),
+        // Preserve the existing payment-received flag on save so editing
+        // a document never silently resets its payment status.
+        paymentReceived: doc.document?.paymentReceived === true,
       };
 
       const response = await fetch(
@@ -276,6 +302,9 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
 
       // Regenerate the PDF with the edited values, using the same renderer
       // as document creation / regeneration.
+      // NOTE: `formData` (passed below) now carries the original
+      // `invoiceDate`, so generatePDF() prints the same date as the
+      // original document instead of defaulting to today's date.
       const amountForQR = totalRoundOff !== 0 ? balancePayable : total;
       const [qrData, sigImg] = await Promise.all([
         generateQR(
@@ -301,6 +330,10 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
         sigImg,
         appliedRoundOffs,
         noSignature,
+        // NEW — PDF-only custom terms, parsed from the editable textarea.
+        // Never included in `payload` above, so the database record is
+        // completely untouched by this.
+        termsData: textToTermsData(termsText),
       });
 
       onSaved({
@@ -316,9 +349,14 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
         document: {
           ...doc.document,
           invoiceNum: formData.invoiceNum,
+          // FIXED — keep the original date in the locally-patched record
+          // too, so the table view can never drift from what was saved.
+          invoiceDate: formData.invoiceDate,
           gstType: formData.gstType,
           dueDate,
           specialNotes: formData.specialNotes,
+          // Carried through unchanged — see payload.paymentReceived above.
+          paymentReceived: doc.document?.paymentReceived === true,
         },
         gstRates,
         items: payload.items,
@@ -590,6 +628,27 @@ function EditDocumentModal({ doc, qrCanvasRef, onCancel, onSaved }) {
             No Signature (leave blank for manual signing)
           </label>
 
+          {/* NEW — Terms & Conditions editor. PDF-only: edits here are
+              used purely to regenerate this PDF and are never saved to
+              the database record. Format: a heading line, then its
+              bullet lines, with a blank line separating each section
+              (matches the structure already used in the PDF). */}
+          <div className="tapqdocs-modal-section-title">
+            Terms &amp; Conditions{" "}
+            <span style={{ fontWeight: 400, fontSize: "0.85em" }}>
+              (PDF only — not saved to database)
+            </span>
+          </div>
+          <textarea
+            className="tapqdocs-modal-terms-textarea"
+            rows={10}
+            value={termsText}
+            onChange={(e) => setTermsText(e.target.value)}
+            placeholder={
+              "1. Heading\n1. First bullet\n2. Second bullet\n\n2. Next Heading\n1. Bullet..."
+            }
+          />
+
           <div className="tapqdocs-modal-total-row">
             <span>Final Total</span>
             <span>Rs. {(totalRoundOff !== 0 ? balancePayable : total).toFixed(2)}</span>
@@ -643,6 +702,12 @@ export default function TapqDocs() {
 
   // Tracks which document (if any) is currently open in the Edit modal.
   const [editingDoc, setEditingDoc] = useState(null);
+
+  // NEW — Tracks which specific Tax Invoice row currently has a "mark
+  // payment received" request in flight, so only that row's button shows
+  // a loading state instead of blocking the whole table.
+  const [markingPaidId, setMarkingPaidId] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
 
   const qrCanvasRef = useRef(null);
 
@@ -753,6 +818,10 @@ export default function TapqDocs() {
         custEmail: doc.customer?.email || "",
         custState: doc.customer?.state || "",
         invoiceNum: doc.document?.invoiceNum || "",
+        // Kept consistent with the Edit modal fix: use the ORIGINAL saved
+        // date for regeneration too, instead of letting it default to
+        // today's date.
+        invoiceDate: doc.document?.invoiceDate || "",
         docType: cfg ? cfg.docType : doc.document?.docType || "TAX INVOICE",
         gstType: doc.document?.gstType || "igst",
       };
@@ -861,6 +930,55 @@ export default function TapqDocs() {
     setEditingDoc(null);
   };
 
+  // ── TOGGLE PAYMENT RECEIVED FOR A TAX INVOICE ──────────────────────────
+  // Only relevant for Tax Invoices. Uses the dedicated mark-payment
+  // endpoint (touches only the paymentReceived flag in the database),
+  // then patches local state so the toggle flips immediately without a
+  // full refetch. Two-way — `nextValue` lets the same handler both mark
+  // AND undo (unmark) payment received.
+  const handleTogglePaymentReceived = async (doc, nextValue) => {
+    setMarkingPaidId(doc.documentId);
+    setPaymentError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/tapq/mark-payment/${doc.documentId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentReceived: nextValue }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update payment status");
+      }
+
+      setRawDocuments((prev) => {
+        const key = doc.__collectionKey;
+        const list = prev[key] || [];
+        return {
+          ...prev,
+          [key]: list.map((d) =>
+            d.documentId === doc.documentId
+              ? {
+                  ...d,
+                  document: { ...d.document, paymentReceived: nextValue },
+                }
+              : d,
+          ),
+        };
+      });
+    } catch (err) {
+      console.error("Failed to update payment status:", err);
+      setPaymentError(
+        `Could not update payment status for ${doc.document?.invoiceNum || doc.documentId}: ${err.message || "Unknown error"}`,
+      );
+    } finally {
+      setMarkingPaidId(null);
+    }
+  };
+
   // ── RENDER ────────────────────────────────────────────────────────────
   return (
     <div className="tapqdocs-admin">
@@ -930,6 +1048,12 @@ export default function TapqDocs() {
             <button onClick={() => setRegenerateError(null)}>Dismiss</button>
           </div>
         )}
+        {paymentError && (
+          <div className="tapqdocs-error-banner">
+            ⚠ {paymentError}
+            <button onClick={() => setPaymentError(null)}>Dismiss</button>
+          </div>
+        )}
 
         {/* Loading state */}
         {loading && !loadError && (
@@ -967,6 +1091,9 @@ export default function TapqDocs() {
                 {visibleDocs.map((doc) => {
                   const cfg = doc.__cfg;
                   const isRegenerating = regeneratingId === doc.documentId;
+                  const isTaxInvoice = doc.__collectionKey === "taxInvoices";
+                  const isPaid = doc.document?.paymentReceived === true;
+                  const isMarkingPaid = markingPaidId === doc.documentId;
                   return (
                     <div key={doc.documentId} className="tapqdocs-table-row">
                       <span>
@@ -976,8 +1103,13 @@ export default function TapqDocs() {
                           {cfg ? cfg.label.replace(/s$/, "") : doc.__collectionKey}
                         </span>
                       </span>
-                      <span className="tapqdocs-invoice-num">
-                        {doc.document?.invoiceNum || "—"}
+                      <span className="tapqdocs-invoice-num-cell">
+                        {isTaxInvoice && isPaid && (
+                          <span className="tapqdocs-paid-flag">✓ PAID</span>
+                        )}
+                        <span className="tapqdocs-invoice-num">
+                          {doc.document?.invoiceNum || "—"}
+                        </span>
                       </span>
                       <span className="tapqdocs-cust-cell">
                         <span className="tapqdocs-cust-name">
@@ -1002,6 +1134,35 @@ export default function TapqDocs() {
                           : "—"}
                       </span>
                       <span className="tapqdocs-actions-cell">
+                        {/* NEW — small toggle switch, shown only for Tax
+                            Invoice rows, placed to the left of Edit /
+                            Regenerate. Two-way: flipping it on marks the
+                            invoice paid, flipping it back off undoes it —
+                            both persist via the update-document endpoint.
+                            The "✓ PAID" flag itself is shown above the
+                            invoice number in the Doc Number column, not
+                            here. */}
+                        {isTaxInvoice && (
+                          <label
+                            className={`tapqdocs-paid-toggle ${isMarkingPaid ? "tapqdocs-paid-toggle--busy" : ""}`}
+                            title={isPaid ? "Undo payment received" : "Mark payment received"}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isPaid}
+                              disabled={isMarkingPaid}
+                              onChange={(e) =>
+                                handleTogglePaymentReceived(doc, e.target.checked)
+                              }
+                            />
+                            <span className="tapqdocs-paid-toggle-track">
+                              <span className="tapqdocs-paid-toggle-thumb" />
+                            </span>
+                            <span className="tapqdocs-paid-toggle-label">
+                              {isPaid ? "Paid Payment" : "Payment Pending"}
+                            </span>
+                          </label>
+                        )}
                         <button
                           className="tapqdocs-btn-edit"
                           onClick={() => setEditingDoc(doc)}

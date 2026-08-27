@@ -127,7 +127,39 @@ export const INITIAL_GST_RATES = {
   sgstRate: 9,
 };
 
-// ── UTILITY FUNCTIONS ────────────────────────────────────────────────────────
+// ── TERMS & CONDITIONS: TEXT <-> STRUCTURED CONVERSION ──────────────────────
+// NEW — lets the Edit modal expose Terms & Conditions as one big editable
+// textarea, without needing a whole new nested UI. The format is simple:
+//   - A line with NO leading whitespace and NOT starting with a bullet
+//     number pattern like "1. " immediately after a blank line is treated
+//     as a new section heading (e.g. "1. Design Responsibility").
+//   - Every following non-blank line, up to the next blank line, is a
+//     bullet under that heading.
+//   - Blank lines separate sections.
+// This mirrors the shape of TERMS_DATA exactly, so termsDataToText(
+// TERMS_DATA) round-trips through textToTermsData() back to the same
+// structure. Only used for the PDF — never sent to the backend/database.
+export const termsDataToText = (termsData) => {
+  return (termsData || [])
+    .map(([heading, bullets]) => [heading, ...(bullets || [])].join("\n"))
+    .join("\n\n");
+};
+
+export const textToTermsData = (text) => {
+  if (!text || !text.trim()) return [];
+  const blocks = text
+    .split(/\n\s*\n/) // split on blank lines
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  return blocks.map((block) => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    const [heading, ...bullets] = lines;
+    return [heading || "", bullets];
+  });
+};
+
+
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -393,6 +425,10 @@ export const generatePDF = async (params) => {
     // signature. Defaults to false so behaviour is unchanged unless the
     // "No Signature" checkbox on the form is ticked.
     noSignature,
+    // NEW — optional custom Terms & Conditions for this PDF only. Never
+    // persisted to the database; if not supplied, falls back to the
+    // default TERMS_DATA exactly as before.
+    termsData,
   } = params;
 
   if (!isFormValid(formData, items)) return;
@@ -412,7 +448,15 @@ export const generatePDF = async (params) => {
   const custGstin = (formData.custGstin || "").trim();
   const specialNotes = (formData.specialNotes || "").trim();
   const invoiceNum = formData.invoiceNum.trim() || "D3D-XXXXXXXX";
-  const invoiceDate = todayStr();
+  // FIXED — this previously ALWAYS called todayStr(), completely ignoring
+  // whatever date was passed in via formData.invoiceDate. That meant every
+  // regenerated / edited document's PDF printed the date it happened to be
+  // regenerated on, instead of the document's actual original date — even
+  // though formData.invoiceDate was already being populated correctly by
+  // the caller (TapqDocs.js / AdminTapq.js). Now we use formData.invoiceDate
+  // whenever it's supplied, and only fall back to todayStr() for the
+  // create-new-document flow where no date has been chosen yet.
+  const invoiceDate = (formData.invoiceDate && formData.invoiceDate.trim()) || todayStr();
   const docType = formData.docType;
 
   // Column header for the HSN/SAC column — reflects what codeType(s) the
@@ -428,6 +472,12 @@ export const generatePDF = async (params) => {
   }
 
   const gst = getGstInfo(formData.gstType, gstRates);
+
+  // NEW — use the caller-supplied custom terms if provided (PDF-only,
+  // never saved to the database), otherwise fall back to the default
+  // TERMS_DATA exactly as before.
+  const effectiveTermsData =
+    Array.isArray(termsData) && termsData.length > 0 ? termsData : TERMS_DATA;
 
   // FIXED — MT (top margin) was 0, which made the header sit flush with the
   // page top with no breathing room above the logo. Bumped to 14pt so
@@ -478,9 +528,9 @@ export const generatePDF = async (params) => {
   // CHANGED — sizes brought back up closer to the reference, where the doc
   // title reads at roughly the same visual weight as the brand name.
   const getDocTitleSize = (text) => {
-    if (text.length <= 16) return 16;
-    if (text.length <= 20) return 14;
-    return 12; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 12pt
+    if (text.length <= 16) return 13;
+    if (text.length <= 20) return 11;
+    return 10; // "ADVANCE PAYMENT RECEIPT" (23 chars) fits at 10pt
   };
   const docTitleSize = getDocTitleSize(docType);
 
@@ -535,7 +585,7 @@ export const generatePDF = async (params) => {
 
     const fullW = W - ML - MR;
     const termsColW = (fullW - 14) / 2;
-    const half = Math.ceil(TERMS_DATA.length / 2);
+    const half = Math.ceil(effectiveTermsData.length / 2);
     const calcColHeight = (data) => {
       let h = 0;
       data.forEach(([, bullets]) => {
@@ -547,8 +597,8 @@ export const generatePDF = async (params) => {
       });
       return h;
     };
-    const leftH = calcColHeight(TERMS_DATA.slice(0, half));
-    const rightH = calcColHeight(TERMS_DATA.slice(half));
+    const leftH = calcColHeight(effectiveTermsData.slice(0, half));
+    const rightH = calcColHeight(effectiveTermsData.slice(half));
     sy += Math.max(leftH, rightH);
 
     // gap before footer + footer bar height + small trailing margin
@@ -590,7 +640,18 @@ export const generatePDF = async (params) => {
       doc.rect(x, y, w, h, "S");
     }
   };
-  const rs = (v) => "Rs. " + Number(v).toFixed(2);
+  // NEW — every amount printed in the PDF now gets Indian-style comma
+  // grouping (e.g. "3,95,860.50" instead of "395860.50"), matching how
+  // amounts are conventionally displayed on Indian invoices/quotations.
+  // toLocaleString("en-IN") handles the lakh/crore grouping automatically;
+  // minimumFractionDigits/maximumFractionDigits keep it fixed at 2 decimal
+  // places, same as the previous toFixed(2) behaviour.
+  const rs = (v) =>
+    "Rs. " +
+    Number(v).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   const tx = (str, x, y, opts) => {
     doc.text(str, x, y, opts || {});
   };
@@ -1101,9 +1162,9 @@ export const generatePDF = async (params) => {
   const termsCol1X = ML;
   const termsCol2X = ML + termsColW + 14;
 
-  const half = Math.ceil(TERMS_DATA.length / 2);
-  const termsLeft = TERMS_DATA.slice(0, half);
-  const termsRight = TERMS_DATA.slice(half);
+  const half = Math.ceil(effectiveTermsData.length / 2);
+  const termsLeft = effectiveTermsData.slice(0, half);
+  const termsRight = effectiveTermsData.slice(half);
 
   const renderTermsCol = (data, startX, startY) => {
     let ty = startY;

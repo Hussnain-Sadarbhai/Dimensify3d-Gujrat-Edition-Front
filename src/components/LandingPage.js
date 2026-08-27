@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Upload, Check, ArrowUp, MessageCircle, ArrowRight } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
 import logo from "../images/logo-1.png";
 import API_BASE_URL from "./apiConfig";
 import './LandingPage.css';
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -62,6 +64,12 @@ export default function LandingPage() {
     setMenuOpen(false);
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleExploreMore = (e) => {
+    e.preventDefault();
+    setMenuOpen(false);
+    navigate('/ExploreFeatures');
   };
 
   const handleChange = (e) => {
@@ -214,6 +222,7 @@ export default function LandingPage() {
             <a href="#land-page-process" onClick={scrollToId('land-page-process')}>Process</a>
             <a href="#land-page-why" onClick={scrollToId('land-page-why')}>Why Models</a>
             <a href="#land-page-testimonials" onClick={scrollToId('land-page-testimonials')}>Case Studies</a>
+            <a href="/ExploreFeatures" onClick={handleExploreMore}>Explore More</a>
           </nav>
           <div className="land-page-nav-cta">
             <a href="#land-page-quote" onClick={scrollToId('land-page-quote')} className="land-page-btn land-page-btn-primary">Request a Quote</a>
@@ -236,6 +245,7 @@ export default function LandingPage() {
           <a href="#land-page-process" onClick={scrollToId('land-page-process')}>Process</a>
           <a href="#land-page-why" onClick={scrollToId('land-page-why')}>Why Models</a>
           <a href="#land-page-testimonials" onClick={scrollToId('land-page-testimonials')}>Case Studies</a>
+          <a href="/ExploreFeatures" onClick={handleExploreMore}>Explore More</a>
           <a href="#land-page-quote" onClick={scrollToId('land-page-quote')} className="land-page-btn land-page-btn-primary land-page-mobile-cta">Request a Quote</a>
         </div>
       </header>
@@ -331,26 +341,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* WHY MODELS MATTER */}
-        <section className="land-page-pad land-page-why-bg" id="land-page-why">
-          <div className="land-page-container">
-            <div className="land-page-sec-head land-page-reveal">
-              <span className="land-page-eyebrow land-page-eyebrow-light">The Case For Physical</span>
-              <h2>Why physical models matter</h2>
-              <p>A rendering asks people to imagine. A physical model lets them decide — faster approvals, fewer revisions, clearer conversations.</p>
-            </div>
-            <div className="land-page-compare-grid">
-              {whyItems.map((w, i) => (
-                <div className="land-page-compare-card land-page-reveal" key={i}>
-                  <div className="land-page-compare-num">{w.num}</div>
-                  <h4>{w.title}</h4>
-                  <p>{w.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* INDUSTRIES */}
         <section className="land-page-pad-tight" id="land-page-industries">
           <div className="land-page-container">
@@ -402,6 +392,26 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* WHY MODELS MATTER */}
+        <section className="land-page-pad land-page-why-bg" id="land-page-why">
+          <div className="land-page-container">
+            <div className="land-page-sec-head land-page-reveal">
+              <span className="land-page-eyebrow land-page-eyebrow-light">The Case For Physical</span>
+              <h2>Why physical models matter</h2>
+              <p>A rendering asks people to imagine. A physical model lets them decide — faster approvals, fewer revisions, clearer conversations.</p>
+            </div>
+            <div className="land-page-compare-grid">
+              {whyItems.map((w, i) => (
+                <div className="land-page-compare-card land-page-reveal" key={i}>
+                  <div className="land-page-compare-num">{w.num}</div>
+                  <h4>{w.title}</h4>
+                  <p>{w.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* STATS */}
         <section className="land-page-pad-tight">
           <div className="land-page-container">
@@ -416,7 +426,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* TESTIMONIALS */}
+        {/* TESTIMONIALS (Case Studies) */}
         <section className="land-page-pad-tight" id="land-page-testimonials">
           <div className="land-page-container">
             <div className="land-page-sec-head land-page-reveal">
